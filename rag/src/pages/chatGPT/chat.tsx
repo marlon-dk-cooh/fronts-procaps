@@ -26,7 +26,6 @@ import {
 import ListFile from "@/components/custom/ListFile";
 import { Button } from "@/components/ui/button";
 import UseLogout from "@/hooks/useLogout";
-import { useMsal } from "@azure/msal-react";
 import { useTheme } from "@/context/ThemeContext";
 
 interface Message {
@@ -67,7 +66,6 @@ export function Chat({
   const [isSearch, setIsSearch] = useState(false);
   const isStop = useRef<boolean>(false);
   const { logout, user } = UseLogout();
-  const { accounts } = useMsal();
   const { modelSelect } = useTheme();
 
   const pushMessage = (msg: Message) => {
@@ -358,7 +356,7 @@ export function Chat({
           {newChat && (
             <div className="flex flex-1 justify-center items-center p-2">
               <h1 className="text-3xl font-bold break-all text-center">
-                ¡Hola, <span className="font-normal">{accounts[0].name}</span>!
+                ¡Hola, <span className="font-normal">test</span>!
               </h1>
             </div>
           )}

@@ -6,36 +6,32 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import UseLogout from "@/hooks/useLogout";
+import { getSchemas } from "@/api/ApiSQL";
 
-// chatinput.tsx
 interface ChatInputProps {
   question: string;
   setQuestion: (value: string) => void;
   onSubmit: (text?: string) => void;
   isLoading: boolean;
-  // selectedCatalog: string;
-  // setSelectedCatalog: (catalog: string) => void; // <- esto debe ser una función
   selectedSchema: string;
-  setSelectedSchema: (schema: string) => void; // <- esto también
+  setSelectedSchema: (schema: string) => void;
   instructions: string;
   setInstructions: (value: string) => void;
   hasStartedChat: boolean;
 }
 
+// TODO: Edita las sugerencias de ejemplo para tu caso de uso
 const suggestedActions = [
   {
-    title: "¿Comparando el acumulado del año actual vs. el anterior, ",
-    label:
-      "cuál es la variación en ventas netas por kilos y pesos a total compañía?",
-    action:
-      "¿Comparando el acumulado del año actual vs. el anterior, cuál es la variación en ventas netas por kilos y pesos a total compañía?",
+    title: "¿Cuáles son los productos más vendidos",
+    label: "en los últimos 3 meses?",
+    action: "¿Cuáles son los productos más vendidos en los últimos 3 meses?",
   },
   {
-    title: "¿Cuál es la cadena con el mayor ",
-    label:
-      "porcentaje de descuentos sobre la venta neta en los últimos 3 meses?",
+    title: "¿Cuál es la variación de ventas",
+    label: "comparando el año actual vs. el anterior?",
     action:
-      "¿Cuál es la cadena con el mayor porcentaje de descuentos sobre la venta neta en los últimos 3 meses?",
+      "¿Cuál es la variación de ventas comparando el año actual vs. el anterior?",
   },
 ];
 
@@ -58,20 +54,9 @@ export const ChatInput = ({
   const [isLoadSchema, setIsLoadSchema] = useState(false);
   const { logout } = UseLogout();
 
-  const token = sessionStorage.getItem("accessToken");
-
   useEffect(() => {
     setIsLoadSchema(true);
-    fetch(
-      `${import.meta.env.VITE_APP_API_URL_SQL}/api/schemas?catalog=${CATALOG}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    )
-      .then((res) => res.json())
+    getSchemas(CATALOG)
       .then((data) => {
         logout(data?.detail || "");
         if (Array.isArray(data.schemas)) {
@@ -79,7 +64,6 @@ export const ChatInput = ({
         } else {
           toast.error("El backend no devolvió un array de schemas");
         }
-        logout(data?.detail || "");
       })
       .catch((err) => {
         toast.error("Error al cargar los schemas");
@@ -131,9 +115,7 @@ export const ChatInput = ({
           disabled={!CATALOG}
         >
           {isLoadSchema ? (
-            <option selected>
-              Cargando <span className="">...</span>
-            </option>
+            <option>Cargando...</option>
           ) : (
             <>
               <option value="">Selecciona un esquema</option>
@@ -155,17 +137,14 @@ export const ChatInput = ({
               (t) => (
                 <div className="bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-xl p-4 shadow-lg w-full max-w-xs sm:max-w-sm md:max-w-md text-sm flex flex-col gap-2">
                   <div className="font-semibold text-base">
-                    ¿Cómo usar el Agente SQL de Alqueria?
+                    ¿Cómo usar el Agente SQL?
                   </div>
                   <div className="text-muted-foreground leading-relaxed">
-                    1. Selecciona un <strong>catálogo</strong> de la lista.
+                    1. Selecciona un <strong>esquema</strong> de la lista.
                     <br />
-                    2. Luego selecciona un <strong>esquema</strong> relacionado.
+                    2. Escribe tu pregunta en lenguaje natural.
                     <br />
-                    3. Escribe una pregunta como “¿Cual es el producto mas
-                    vendido?”
-                    <br />
-                    4. Presiona <strong>Enter</strong> o el ícono de enviar.
+                    3. Presiona <strong>Enter</strong> o el ícono de enviar.
                   </div>
                   <Button
                     size="sm"
@@ -208,9 +187,8 @@ export const ChatInput = ({
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
-
             if (isLoading) {
-              toast.error("Please wait for the model to finish its response!");
+              toast.error("Por favor espera a que termine la respuesta.");
             } else {
               setShowSuggestions(false);
               onSubmit();

@@ -1,49 +1,42 @@
+// ============================================================
+// USER / LOGOUT HOOK — Conecta tu sistema de autenticación aquí
+// ============================================================
+// TODO: Reemplaza esta implementación con la de tu proveedor de auth.
+//
+// Ejemplos:
+//   - MSAL: usar useMsal() y instance.logoutRedirect()
+//   - Auth0: usar useAuth0() y logout()
+//   - Keycloak: usar useKeycloak() y keycloak.logout()
+//   - JWT propio: limpiar token y redirigir a /login
+// ============================================================
+
 import { User } from "@/interfaces/interfaces";
-import { useMsal } from "@azure/msal-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { clearAuthToken } from "@/utils/auth";
+import { useState } from "react";
 
 export default function UseLogout() {
-  const { instance, accounts } = useMsal();
-  const [user, setUser] = useState<User | null>(null);
+  // TODO: Reemplaza con el usuario real de tu auth provider
+  const [user] = useState<User>({
+    email: "usuario@ejemplo.com",
+    name: "Usuario",
+    roles: [],
+  });
 
-  const logout = (status: string | number) => {
-    // const status =
-    //   err.response?.statusText ??
-    //   err.response?.data?.detail ??
-    //   err.detail ??
-    //   '';
-
-    if (
+  const logout = (status?: string | number) => {
+    // Solo redirige en errores de autenticación reales
+    const isAuthError =
       status === "Unauthorized" ||
       status === "Token inválido" ||
       status === "Token expirado" ||
-      status === "Not authenticated" || status === 401
-    ) {
-      toast.error(
-        "Tu sesión ha expirado. Por favor, inicia sesión nuevamente."
-      );
-      sessionStorage.clear();
+      status === "Not authenticated" ||
+      status === 401;
 
-      instance.logoutRedirect({
-        onRedirectNavigate: () => false,
-      });
+    if (isAuthError) {
+      // TODO: Agrega lógica de logout de tu proveedor aquí
+      clearAuthToken();
+      window.location.href = "/";
     }
   };
 
-  useEffect(() => {
-    if (accounts.length) {
-      const { name, username } = accounts[0];
-      setUser({
-        email: username ?? "",
-        name: name ?? "",
-        roles: ["Tester"],
-      });
-    } else setUser(null);
-  }, [accounts]);
-
-  return {
-    logout,
-    user,
-  };
+  return { logout, user };
 }

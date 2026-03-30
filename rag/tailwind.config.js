@@ -20,6 +20,28 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // ============================================================
+        // COLORES DE MARCA — Definidos en src/index.css como variables CSS
+        // Uso: bg-brand-primary, text-brand-secondary, etc.
+        // ============================================================
+        brand: {
+          primary: {
+            DEFAULT: 'hsl(var(--brand-primary))',
+            foreground: 'hsl(var(--brand-primary-foreground))',
+          },
+          secondary: {
+            DEFAULT: 'hsl(var(--brand-secondary))',
+            foreground: 'hsl(var(--brand-secondary-foreground))',
+          },
+          accent: {
+            DEFAULT: 'hsl(var(--brand-accent))',
+            foreground: 'hsl(var(--brand-accent-foreground))',
+          },
+        },
+
+        // ============================================================
+        // COLORES BASE DEL SISTEMA UI (Shadcn/Radix)
+        // ============================================================
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -76,6 +98,6 @@ export default {
   plugins: [
     require('tailwindcss-animate'),
     require('@tailwindcss/typography'),
-    scrollbar({ nocompatible: true }) // ✅ usa modo moderno sin `variants`
+    scrollbar({ nocompatible: true }),
   ],
 }

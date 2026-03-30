@@ -50,5 +50,5 @@ export interface ConversationDetailResponse {
 export interface User {
   name: string;
   email: string;
-  roles: ["Tester"];
+  roles: string[];
 }

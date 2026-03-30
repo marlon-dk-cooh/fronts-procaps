@@ -8,46 +8,35 @@ import { useEffect, useState } from "react";
 import { MainLayout } from "./components/layout/MainLayout";
 import { ChatSQL } from "./pages/chatSql/chatSQL";
 import api from "./api/ApiGPT";
-import UseLogout from "./hooks/useLogout";
+import { getAuthToken } from "./utils/auth";
 
-export default function PrivateRoutes() {
+export default function AppRoutes() {
   const [chats, setChats] = useState<ChatInterface[]>([]);
   const [allMessages, setAllMessages] = useState({});
-  const { logout, user } = UseLogout();
   const [isLoadingChats, setIsLoadingChats] = useState(false);
 
   function getAllChats() {
-    if (!user) return;
     setIsLoadingChats(true);
-    const token = sessionStorage.getItem("accessToken") || "";
     api
-      .requestAllSession(token)
+      .requestAllSession(getAuthToken())
       .then((res: ConversationSessionResponse) => {
-        // Formatear la data para almacenarlo en la variable chats
         setChats(
-          res.sessions.map((chat) => {
-            return {
-              ...chat,
-              chatId: chat.id,
-              title: chat.conversation_name,
-            };
-          })
+          res.sessions.map((chat) => ({
+            ...chat,
+            chatId: chat.id,
+            title: chat.conversation_name,
+          }))
         );
       })
       .catch((err) => {
-        console.log(err);
-        logout(err?.status || "");
+        console.error("Error fetching sessions:", err);
       })
       .finally(() => setIsLoadingChats(false));
   }
 
   function removeChatFromState(chatId: string) {
     if (!chatId) return;
-
-    // 1. Eliminar el chat de la lista
     setChats((prev) => prev.filter((chat) => chat.chatId !== chatId));
-
-    // 2. Eliminar los mensajes asociados en allMessages
     setAllMessages((prev: any) => {
       const newObj = { ...prev };
       delete newObj[chatId];
@@ -57,11 +46,10 @@ export default function PrivateRoutes() {
 
   useEffect(() => {
     getAllChats();
-  }, [user]);
+  }, []);
 
   return (
     <Routes>
-      {/* Rutas dentro del layout */}
       <Route
         element={
           <MainLayout

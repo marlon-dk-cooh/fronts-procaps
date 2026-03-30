@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 import { useEffect } from "react";
-import { recoverChat } from "@/api/ApiSQL";
+import { recoverChat, askSQL, saveSql } from "@/api/ApiSQL";
 import UseLogout from "@/hooks/useLogout";
 
 interface AssistantMessage {
@@ -155,34 +155,13 @@ export function ChatSQL() {
 
     setIsLoading(true);
 
-    const token = sessionStorage.getItem("accessToken");
-
-    let res: Response | any = null;
-
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_APP_API_URL_SQL}/api/ask`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            question: messageText,
-            catalog: CATALOG, // 👈 Usar el seleccionado
-            schema: selectedSchema, // 👈 Usar el seleccionado
-            instructions: instructions,
-          }),
-        }
-      );
-
-      if (res.status == 401) {
-        logout("Unauthorized");
-      }
-
-      if (!res.ok) throw new Error("Error en el backend");
-      const data = await res.json();
+      const data = await askSQL({
+        question: messageText,
+        catalog: CATALOG,
+        schema: selectedSchema,
+        instructions: instructions,
+      });
 
       const { answer, sql_query, sql_result } = data;
       const { columns, rows } = parseSQLResult(sql_result);
@@ -201,9 +180,8 @@ export function ChatSQL() {
       console.error("Error al contactar el backend:", error);
       logout(error?.status || "");
 
-      // Agregar un mensaje  de error dinamico
-      const isTimeout = error.message.includes("timeout");
-      const isServerError = res?.status >= 500;
+      const isTimeout = error.message?.includes("timeout");
+      const isServerError = error?.response?.status >= 500;
 
       const friendlyMessage = isTimeout
         ? "Pensar una respuesta está tomando más tiempo de lo esperado. Por favor, intenta de nuevo un poco más tarde."
@@ -327,7 +305,7 @@ export function ChatSQL() {
     const fetchHistory = async () => {
       const user_id = "t0_example_auth0|648fd12a7c34aa00125a4b98";
       const jwt = "t0_example_auth0|648fd12a7c34aa00125a4b98";
-      const token = sessionStorage.getItem("accessToken");
+      const token = getAuthToken();
 
       if (!token) {
         console.warn("No token found");
@@ -563,37 +541,14 @@ export function ChatSQL() {
                           onClick={async () => {
                             setIsLoading(true);
                             try {
-                              const token =
-                                sessionStorage.getItem("accessToken");
+                              const data = await askSQL({
+                                question: userMsg.content,
+                                catalog: CATALOG,
+                                schema: selectedSchema,
+                                instructions: instructions,
+                                corrected_sql_query: assistantMsg.sql,
+                              });
 
-                              const res = await fetch(
-                                `${
-                                  import.meta.env.VITE_APP_API_URL_SQL
-                                }/api/ask`,
-                                {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                    accept: "application/json",
-                                    Authorization: `Bearer ${token}`,
-                                  },
-                                  body: JSON.stringify({
-                                    question: userMsg.content,
-                                    catalog: CATALOG,
-                                    schema: selectedSchema,
-                                    instructions: instructions,
-                                    corrected_sql_query: assistantMsg.sql,
-                                  }),
-                                }
-                              );
-
-                              if (!res.ok)
-                                throw new Error(
-                                  "Error al ejecutar la consulta editada"
-                                );
-
-                              const data = await res.json();
-                              logout(data?.detail || "");
                               const { answer, sql_result } = data;
                               const { columns, rows } =
                                 parseSQLResult(sql_result);
@@ -624,30 +579,12 @@ export function ChatSQL() {
                         <button
                           onClick={async () => {
                             try {
-                              const token =
-                                sessionStorage.getItem("accessToken");
-
-                              const res = await fetch(
-                                `${
-                                  import.meta.env.VITE_APP_API_URL
-                                }/api/save-sql`,
-                                {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${token}`,
-                                    accept: "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    question: userMsg.content,
-                                    sql_query: assistantMsg.sql,
-                                    catalog: CATALOG,
-                                    db_schema: selectedSchema,
-                                  }),
-                                }
-                              );
-                              if (!res.ok)
-                                throw new Error("Error al guardar la consulta");
+                              await saveSql({
+                                question: userMsg.content,
+                                sql_query: assistantMsg.sql,
+                                catalog: CATALOG,
+                                db_schema: selectedSchema,
+                              });
                               alert("Consulta guardada correctamente ✅");
                             } catch (err: any) {
                               logout(err?.status || "");

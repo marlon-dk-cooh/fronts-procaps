@@ -1,19 +1,26 @@
+// ============================================================
+// API GPT — Cliente HTTP para el backend de chat
+// ============================================================
+// Para activar mocks: VITE_USE_MOCKS=true en .env
+// Para usar backend real: VITE_USE_MOCKS=false (o eliminar la variable)
+//
+// El token se obtiene de getAuthToken(). Cambia esa función en
+// src/utils/auth.ts para conectar tu proveedor de autenticación.
+// ============================================================
+
 import axios, { AxiosInstance } from "axios";
+import { getAuthToken } from "@/utils/auth";
+import mockApi from "@/mocks/apiGPT.mock";
 
 const BASE_URL = import.meta.env.VITE_APP_API_URL_GPT;
 
 const apiClientMultipart: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  headers: {
-    "Content-Type": "multipart/form-data",
-  },
+  headers: { "Content-Type": "multipart/form-data" },
 });
 
-const apiClientCommon: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
-});
+const apiClientCommon: AxiosInstance = axios.create({ baseURL: BASE_URL });
 
-// Tipos para las funciones
 interface ChatRequestData {
   query: string;
   conversation_id: string;
@@ -30,26 +37,11 @@ interface VoteRequestData {
   rate: number;
 }
 
-interface AttachmentFile {
-  [key: string]: any;
-}
-
 interface ApiResponse<T = any> {
   data: T;
 }
 
-const api = {
-  async requestToken(code: string): Promise<any> {
-    const response: ApiResponse = await apiClientCommon.get(
-      `/auth/token?code=${code}`
-    );
-    return response.data;
-  },
-
-  async requestLogin(): Promise<void> {
-    window.location.href = `${BASE_URL}/auth/login`;
-  },
-
+const realApi = {
   async requestAllSession(token: string): Promise<any> {
     const response: ApiResponse = await apiClientCommon.get("/chat/sessions", {
       headers: {
@@ -64,14 +56,10 @@ const api = {
     const response: ApiResponse = await apiClientCommon.get(
       "/chat/get_one_session",
       {
-        params: {
-          conversation_id: session_id,
-        },
+        params: { conversation_id: session_id },
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            sessionStorage.getItem("accessToken") ?? ""
-          }`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       }
     );
@@ -84,9 +72,7 @@ const api = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            sessionStorage.getItem("accessToken") ?? ""
-          }`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       }
     );
@@ -111,62 +97,50 @@ const api = {
       model_name,
       search_tool: model_name === "o1-mini" ? false : search_tool,
     };
-
     const response: ApiResponse = await apiClientCommon.post(
       "/chat/message",
       requestData,
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            sessionStorage.getItem("accessToken") ?? ""
-          }`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       }
     );
     return response.data;
   },
 
-  async requestAttachment(attachment: AttachmentFile): Promise<any> {
+  async requestAttachment(attachment: any): Promise<any> {
     const response: ApiResponse = await apiClientMultipart.post(
       "/chat/attachment",
       attachment,
-      {
-        headers: {
-          Authorization: `Bearer ${
-            sessionStorage.getItem("accessToken") ?? ""
-          }`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${getAuthToken()}` } }
     );
     return response.data;
   },
 
-  async requestVote(
-    msg_id: string,
-    vote: number,
-    session_id: string
-  ): Promise<any> {
+  async requestVote(msg_id: string, vote: number, session_id: string): Promise<any> {
     const requestData: VoteRequestData = {
       id: msg_id,
       thread_id: session_id,
       rate: vote,
     };
-
     const response: ApiResponse = await apiClientCommon.post(
       "/chat/vote",
       requestData,
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            sessionStorage.getItem("accessToken") ?? ""
-          }`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       }
     );
     return response.data;
   },
 };
+
+// Cambia VITE_USE_MOCKS=true en .env para usar datos de prueba
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+const api = USE_MOCKS ? mockApi : realApi;
 
 export default api;
