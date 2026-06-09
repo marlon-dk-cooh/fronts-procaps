@@ -58,6 +58,14 @@ const mockApi = {
     await delay(200);
     return { success: true };
   },
+
+  async requestRenameSession(
+    _session_id: string,
+    _new_title: string
+  ): Promise<any> {
+    await delay(300);
+    return { success: true };
+  },
 };
 
 export default mockApi;

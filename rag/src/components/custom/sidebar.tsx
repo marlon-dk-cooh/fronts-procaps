@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { SquarePen, ChevronRight, Database, Trash2 } from "lucide-react";
+import { SquarePen, ChevronRight, Database, Trash2, Pencil, Check, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChatInterface } from "@/interfaces/interfaces";
 import api from "@/api/ApiGPT";
@@ -12,6 +12,7 @@ interface SidebarProps {
   changeIsOpenNav: () => void;
   chats: ChatInterface[];
   removeChatFromState: (chatId: string) => void;
+  renameChatInState: (chatId: string, newTitle: string) => void;
   isLoad: boolean;
 }
 type typeChat = "c" | "sql";
@@ -21,14 +22,15 @@ export function Sidebar({
   changeIsOpenNav,
   chats,
   removeChatFromState,
+  renameChatInState,
   isLoad,
 }: SidebarProps) {
   const { id: chatIdParam } = useParams<{ id: string }>();
   const { logout } = UseLogout();
   const [openModal, setOpenModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleteName, setDeleteName] = useState<string>(""); // ← nuevo
-  const [loadingDelete, setLoadingDelete] = useState(false); // ← nuevo
+  const [deleteName, setDeleteName] = useState<string>("");
+  const [loadingDelete, setLoadingDelete] = useState(false);
 
   const navigate = useNavigate();
 
@@ -132,11 +134,10 @@ export function Sidebar({
           {isLoad && (
             <>
               <div className={`space-y-2 animate-pulse`}>
-                {/* Generamos 5 items de esqueleto */}
                 {Array(5)
                   .fill(0)
                   .map((_, index) => (
-                    <SkeletonItem key={index} /> // Ya no necesitamos pasar isDarkMode
+                    <SkeletonItem key={index} />
                   ))}
               </div>
             </>
@@ -165,11 +166,9 @@ export function Sidebar({
                 openProject ? "opacity-100" : "opacity-0"
               }`}
             >
-              <div
-                className={`overflow-y-auto transition-all duration-500 ease-in-out`}
-              >
+              <div className={`overflow-y-auto transition-all duration-500 ease-in-out`}>
                 {chats
-                  .sort(
+                  .toSorted(
                     (a, b) =>
                       new Date(b.created_at).getTime() -
                       new Date(a.created_at).getTime()
@@ -179,14 +178,13 @@ export function Sidebar({
                       key={chatId}
                       text={title}
                       active={chatId == chatIdParam}
-                      onActive={() => {
-                        selectChat(chatId);
-                      }}
+                      onActive={() => selectChat(chatId)}
                       onDelete={() => {
                         setDeleteId(chatId);
-                        setDeleteName(title); // ← nombre del chat
+                        setDeleteName(title);
                         setOpenModal(true);
                       }}
+                      onRename={(newTitle) => renameChatInState(chatId, newTitle)}
                     />
                   ))}
               </div>
@@ -208,6 +206,7 @@ type PropsSideBarItem = {
   onActive: () => void;
   isSticky?: boolean;
   onDelete?: (() => void) | null;
+  onRename?: ((newTitle: string) => void) | null;
 };
 
 const SideBarItem = ({
@@ -217,64 +216,107 @@ const SideBarItem = ({
   onActive,
   isSticky = false,
   onDelete = null,
+  onRename = null,
 }: PropsSideBarItem) => {
   const itemRef = useRef<HTMLButtonElement | null>(null);
   const [isStickyActive, setIsStickyActive] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(text);
 
   useEffect(() => {
     if (!isSticky || !itemRef.current) return;
-
     const el = itemRef.current;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Cuando deja de estar completamente visible (se “pega” al top)
-        setIsStickyActive(!entry.isIntersecting);
-      },
+      ([entry]) => setIsStickyActive(!entry.isIntersecting),
       { rootMargin: "-1px 0px 0px 0px", threshold: [1] }
     );
-
     observer.observe(el);
     return () => observer.disconnect();
   }, [isSticky]);
 
+  const confirmRename = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== text) onRename?.(trimmed);
+    setIsEditing(false);
+  };
+
+  const cancelRename = () => {
+    setEditValue(text);
+    setIsEditing(false);
+  };
+
+  const baseClass = `flex flex-row items-center w-full p-2 gap-2 rounded-lg text-sm
+    text-neutral-700 dark:text-neutral-200 font-normal transition-all duration-300 justify-between group
+    ${active ? "bg-[#00A19B20] !text-[#00A19B] font-semibold" : "bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-700"}
+    ${isSticky ? "sticky top-0" : ""}
+    ${isStickyActive ? "border-b border-gray-300 shadow-sm bg-white" : ""}`;
+
+  if (isEditing) {
+    return (
+      <div className={baseClass}>
+        <input
+          autoFocus
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); confirmRename(); }
+            if (e.key === "Escape") cancelRename();
+          }}
+          className="bg-transparent outline-none border-b border-[#00A19B] text-sm w-full min-w-0"
+        />
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={confirmRename}
+            className="p-0.5 text-[#00A19B] hover:opacity-80"
+          >
+            <Check size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={cancelRename}
+            className="p-0.5 text-neutral-400 hover:opacity-80"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
       ref={itemRef}
-      className={`flex flex-row items-center w-full p-2 gap-2 rounded-lg text-sm text-neutral-700 dark:text-neutral-200 font-normal transition-all duration-300
-      justify-between group
-      ${
-        active
-          ? "bg-[#00A19B20] !text-[#00A19B] font-semibold"
-          : "bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-700"
-      }
-      ${isSticky ? "sticky top-0" : ""}
-      ${isStickyActive ? "border-b border-gray-300 shadow-sm bg-white" : ""}`}
+      className={baseClass}
       onClick={onActive}
       style={text ? {} : { placeContent: "center" }}
     >
-      <div className="flex gap-2">
-        {icon && <div className="w-fit">{icon}</div>}
-        {text && <span className="text-nowrap">{text}</span>}
+      <div className="flex gap-2 overflow-hidden">
+        {icon && <div className="w-fit flex-shrink-0">{icon}</div>}
+        {text && <span className="truncate">{text}</span>}
       </div>
-      {onDelete && (
-        <Trash2
-          height={20}
-          onClick={(e) => {
-            e.stopPropagation(); // Detiene el evento aquí, no llega al padre
-            onDelete();
-          }}
-          className="z-40 flex lg:hidden lg:group-hover:flex"
-        />
+      {(onDelete || onRename) && (
+        <div className="flex gap-1 flex-shrink-0 z-40 hidden group-hover:flex">
+          {onRename && (
+            <Pencil
+              size={15}
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditValue(text); }}
+              className="cursor-pointer text-neutral-400 hover:text-[#00A19B]"
+            />
+          )}
+          {onDelete && (
+            <Trash2
+              size={15}
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="cursor-pointer text-neutral-400 hover:text-red-500"
+            />
+          )}
+        </div>
       )}
     </button>
   );
 };
 
 const SkeletonItem = () => (
-  <div
-    className={`
-        h-6 rounded-full w-full 
-        bg-gray-300 dark:bg-gray-600
-      `}
-  />
+  <div className="h-6 rounded-full w-full bg-gray-300 dark:bg-gray-600" />
 );

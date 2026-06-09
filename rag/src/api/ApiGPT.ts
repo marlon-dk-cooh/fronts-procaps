@@ -119,6 +119,20 @@ const realApi = {
     return response.data;
   },
 
+  async requestRenameSession(session_id: string, new_title: string): Promise<any> {
+    const response: ApiResponse = await apiClientCommon.patch(
+      `/chat/rename_session/${session_id}`,
+      { conversation_name: new_title },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      }
+    );
+    return response.data;
+  },
+
   async requestVote(msg_id: string, vote: number, session_id: string): Promise<any> {
     const requestData: VoteRequestData = {
       id: msg_id,

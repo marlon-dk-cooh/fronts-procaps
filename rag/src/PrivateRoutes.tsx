@@ -46,6 +46,13 @@ export default function AppRoutes() {
     });
   }
 
+  function renameChatInState(chatId: string, newTitle: string) {
+    setChats((prev) =>
+      prev.map((chat) => (chat.chatId === chatId ? { ...chat, title: newTitle } : chat))
+    );
+    api.requestRenameSession(chatId, newTitle).catch(console.error);
+  }
+
   useEffect(() => {
     getAllChats();
   }, []);
@@ -60,6 +67,7 @@ export default function AppRoutes() {
           <MainLayout
             chats={chats}
             removeChatFromState={removeChatFromState}
+            renameChatInState={renameChatInState}
             isLoading={isLoadingChats}
           />
         }

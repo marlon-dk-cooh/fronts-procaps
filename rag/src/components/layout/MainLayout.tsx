@@ -7,10 +7,11 @@ import { ChatInterface } from "@/interfaces/interfaces";
 type props = {
   chats: ChatInterface[];
   removeChatFromState: (chatId: string) => void;
+  renameChatInState: (chatId: string, newTitle: string) => void;
   isLoading: boolean;
 };
 
-export function MainLayout({ chats, removeChatFromState, isLoading }: props) {
+export function MainLayout({ chats, removeChatFromState, renameChatInState, isLoading }: props) {
   // 2. Inicializar el estado comprobando el ancho de la ventana
   const [isOpen, setIsOpen] = useState(() => {
     // Si el ancho es mayor a 1024px (Desktop), inicia en true. Si no, false.
@@ -40,6 +41,7 @@ export function MainLayout({ chats, removeChatFromState, isLoading }: props) {
           changeIsOpenNav={toggleSidebar}
           chats={chats}
           removeChatFromState={removeChatFromState}
+          renameChatInState={renameChatInState}
           isLoad={isLoading}
         />
         <div
