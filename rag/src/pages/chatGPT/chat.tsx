@@ -182,7 +182,7 @@ export function Chat({
           },
           ...prev,
         ]);
-        navigate(`/c/${idChat}`);
+        navigate(`/sema/c/${idChat}`);
       }
       setIsLoading(false);
       setFiles([]);
@@ -224,7 +224,7 @@ export function Chat({
         const msgs: ConversationMessage[] = res.messages ?? [];
         if (msgs.length == 0) {
           toast.error(`No existe la conversación ${id}`);
-          navigate("/");
+          navigate("/sema");
           return;
         }
         setAllMsg((prev) => {

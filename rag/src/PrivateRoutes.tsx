@@ -9,6 +9,8 @@ import { MainLayout } from "./components/layout/MainLayout";
 import { ChatSQL } from "./pages/chatSql/chatSQL";
 import api from "./api/ApiGPT";
 import { getAuthToken } from "./utils/auth";
+import { Home } from "./pages/home/Home";
+import { Valida } from "./pages/valida/Valida";
 
 export default function AppRoutes() {
   const [chats, setChats] = useState<ChatInterface[]>([]);
@@ -50,6 +52,9 @@ export default function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/valida" element={<Valida />} />
+
       <Route
         element={
           <MainLayout
@@ -60,7 +65,7 @@ export default function AppRoutes() {
         }
       >
         <Route
-          path="/"
+          path="/sema"
           element={
             <Chat
               newChat
@@ -72,7 +77,7 @@ export default function AppRoutes() {
           }
         />
         <Route
-          path="/c/:id"
+          path="/sema/c/:id"
           element={
             <Chat
               setChats={setChats}
