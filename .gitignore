@@ -81,3 +81,30 @@ tmp/
 temp/
 deploy.sh
 dev.sh
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite
+dist-ssr
+
+# pnpm / yarn berry
+pnpm-debug.log*
+lerna-debug.log*
+.pnp
+.pnp.js
+
+# Additional caches
+.stylelintcache
+.parcel-cache/
+
+# Next.js static export
+/out
+
+# Python bytecode extras
+*.py[cod]
+*.pyo
+*.pyd
+
+# Logs directory
+logs/
