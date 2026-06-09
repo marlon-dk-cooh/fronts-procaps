@@ -31,12 +31,18 @@ export function Home() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-16">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
+      style={{ background: "linear-gradient(63deg, rgba(0,166,156,1) 0%, rgba(95,173,227,1) 50%, rgba(33,38,78,1) 100%)" }}
+    >
       <div className="mb-12 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground mb-3">
+        <h1
+          className="text-4xl font-bold tracking-tight text-white mb-3"
+          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5), 0 0 2px rgba(0,0,0,0.8)" }}
+        >
           Mis agentes
         </h1>
-        <p className="text-muted-foreground text-lg max-w-xl">
+        <p className="text-white/70 text-lg max-w-xl">
           Selecciona un agente para comenzar
         </p>
       </div>
@@ -46,13 +52,13 @@ export function Home() {
           <button
             key={agent.id}
             onClick={() => navigate(agent.path)}
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="group relative overflow-hidden rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
           >
-            <div className="p-6">
-              <h2 className="mt-3 text-xl font-semibold text-foreground">
+            <div className="p-6 flex flex-col items-center text-center">
+              <h2 className="mt-3 text-xl font-semibold text-white">
                 {agent.name}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              <p className="mt-2 text-sm text-white/70 leading-relaxed">
                 {agent.description}
               </p>
             </div>
