@@ -244,7 +244,7 @@ const SideBarItem = ({
       justify-between group
       ${
         active
-          ? "bg-[#fc102850] !text-[#ed1b2e] font-semibold"
+          ? "bg-[#00A19B20] !text-[#00A19B] font-semibold"
           : "bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-700"
       }
       ${isSticky ? "sticky top-0" : ""}
