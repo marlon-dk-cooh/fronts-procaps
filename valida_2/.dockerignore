@@ -1,0 +1,15 @@
+# NOTA: .env NO se ignora a propósito — Vite lo necesita en build time.
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+.git
+.gitignore
+.vscode
+.idea
+Dockerfile
+.dockerignore
+README.md
+docs
+image
