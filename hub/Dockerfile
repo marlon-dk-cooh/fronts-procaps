@@ -15,7 +15,7 @@ COPY . .
 
 # VALIDA está integrada nativamente en el código del hub (hub/src/valida/),
 # así que solo necesita su URL de backend al momento del build.
-ARG VITE_APP_API_URL_VALIDA="https://azcrprocapsdevservicios.icymushroom-816c3a5a.westus.azurecontainerapps.io/api/v1"
+ARG VITE_APP_API_URL_VALIDA="https://azcaprocapsvalidadev.whitewater-c313517d.westus2.azurecontainerapps.io/api/v1"
 ENV VITE_APP_API_URL_VALIDA=$VITE_APP_API_URL_VALIDA
 
 # Build the application
