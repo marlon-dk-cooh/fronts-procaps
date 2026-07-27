@@ -90,7 +90,7 @@ export function Sidebar({
       ${
         isOpen
           ? "lg:w-3/12 w-8/12 top-0"
-          : "w-0 -translate-x-full lg:w-[50px] lg:translate-x-0"
+          : "w-0 -translate-x-full lg:w-[60px] lg:translate-x-0"
       }
     `}
       >

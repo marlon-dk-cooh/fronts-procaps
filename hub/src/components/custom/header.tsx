@@ -1,7 +1,7 @@
 import { Dispatch } from "react";
-import { ThemeToggle } from "./theme-toggle";
-import { LogoutButton } from "./LogoutButton";
+import { UserMenu } from "./UserMenu";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import isotipoSrc from "@/assets/isotipo.png";
 
 type Props = {
@@ -31,14 +31,23 @@ export const Header = ({ setIsOpenNav }: Props) => {
         </svg>
       </button>
 
-      <Link to="/" className="flex items-center gap-2">
-        <img src={isotipoSrc} alt="SEMA" className="h-8 w-auto" />
-        <span className="text-xl font-bold text-brand-primary">SEMA</span>
-      </Link>
+      <div className="flex items-center gap-3">
+        <Link
+          to="/"
+          title="Volver al portal"
+          className="hidden sm:flex items-center gap-1 text-sm font-medium text-neutral-500 hover:text-brand-primary dark:text-neutral-400 dark:hover:text-brand-primary transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Portal
+        </Link>
+        <Link to="/" className="flex items-center gap-2">
+          <img src={isotipoSrc} alt="SEMA" className="h-8 w-auto" />
+          <span className="text-xl font-bold text-brand-primary">SEMA</span>
+        </Link>
+      </div>
 
       <div className="flex flex-row gap-2">
-        <ThemeToggle />
-        <LogoutButton />
+        <UserMenu />
       </div>
     </header>
   );

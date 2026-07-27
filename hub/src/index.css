@@ -117,3 +117,17 @@
     @apply bg-muted text-base px-4 py-2 rounded-xl border h-[42px] min-w-[140px];
   }
 }
+
+/* VALIDA — usadas por hub/src/valida/components/{Badge,DetailPanel}.tsx */
+@keyframes valida-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .3; transform: scale(.55); }
+}
+
+@keyframes valida-bar {
+  0%   { left: -35%; }
+  100% { left: 100%; }
+}
+
+.animate-valida-pulse { animation: valida-pulse 1.4s ease-in-out infinite; }
+.animate-valida-bar   { animation: valida-bar 1.5s ease-in-out infinite; }

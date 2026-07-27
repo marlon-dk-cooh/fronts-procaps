@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import type { Report, WizardForm } from './interface/Report';
 import { INITIAL_REPORTS } from './mock/data';
 import Header from './components/Header';
 import Modal from './components/Modal';
-import ReportsPage from './page/Reports';
-import CreateReport from './page/CreateReport';
-import EditReport from './page/EditReport';
 import { startValidationRun, getRunStatus, downloadReport } from './services/validaApi';
 
 const POLL_INTERVAL_MS = 5000;
@@ -20,7 +17,16 @@ export const EMPTY_FORM: WizardForm = {
   groups: {},
 };
 
-function App() {
+export interface ValidaOutletContext {
+  reports: Report[];
+  addReport: (rep: Report) => void;
+  updateReport: (id: string, patch: Partial<Report>) => void;
+  onDelete: (id: string) => void;
+  onStart: (id: string) => void;
+  onWord: (id: string) => void;
+}
+
+export default function ValidaLayout() {
   const [modal, setModal]     = useState<{ id: string } | null>(null);
   const [reports, setReports] = useState<Report[]>(INITIAL_REPORTS);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -110,34 +116,20 @@ function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#F6F7F9]">
-      <Header />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ReportsPage
-              reports={reports}
-              onStart={id => setModal({ id })}
-              onDelete={deleteReport}
-              onWord={openReport}
-            />
-          }
-        />
-        <Route
-          path="/create"
-          element={<CreateReport addReport={addReport} />}
-        />
-        <Route
-          path="/edit"
-          element={<EditReport reports={reports} updateReport={updateReport} />}
-        />
-      </Routes>
+  const context: ValidaOutletContext = {
+    reports,
+    addReport,
+    updateReport,
+    onDelete: deleteReport,
+    onStart: id => setModal({ id }),
+    onWord: openReport,
+  };
 
+  return (
+    <div className="h-screen overflow-y-auto bg-[#F6F7F9] dark:bg-neutral-950">
+      <Header />
+      <Outlet context={context} />
       {modal && <Modal onClose={() => setModal(null)} onConfirm={confirmStart} />}
     </div>
   );
 }
-
-export default App;

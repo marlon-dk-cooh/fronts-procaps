@@ -10,7 +10,10 @@ import { ChatSQL } from "./pages/chatSql/chatSQL";
 import api from "./api/ApiGPT";
 import { getAuthToken } from "./utils/auth";
 import { Home } from "./pages/home/Home";
-import { Valida } from "./pages/valida/Valida";
+import ValidaLayout from "./valida/ValidaLayout";
+import ValidaReports from "./valida/page/Reports";
+import ValidaCreateReport from "./valida/page/CreateReport";
+import ValidaEditReport from "./valida/page/EditReport";
 
 export default function AppRoutes() {
   const [chats, setChats] = useState<ChatInterface[]>([]);
@@ -60,7 +63,11 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/valida" element={<Valida />} />
+      <Route path="/valida" element={<ValidaLayout />}>
+        <Route index element={<ValidaReports />} />
+        <Route path="create" element={<ValidaCreateReport />} />
+        <Route path="edit" element={<ValidaEditReport />} />
+      </Route>
 
       <Route
         element={

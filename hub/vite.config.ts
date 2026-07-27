@@ -15,17 +15,6 @@ export default defineConfig({
       usePolling: false,
       interval: 1000
     },
-    // El iframe de /valida pide /valida-app/*. Lo reenviamos al dev server de
-    // VALIDA (valida_2, en el puerto 5174) para que en dev cargue desde el mismo
-    // origen. Necesitas tener corriendo `npm run dev` también en valida_2.
-    // ws: true reenvía el websocket del HMR de VALIDA.
-    proxy: {
-      '/valida-app': {
-        target: 'http://localhost:5174',
-        changeOrigin: true,
-        ws: true
-      }
-    }
   },
   resolve: {
     alias: {
