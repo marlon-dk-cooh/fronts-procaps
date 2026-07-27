@@ -14,7 +14,7 @@ export function LogoutButton() {
   return (
     <Button
       variant="outline"
-      className="border border-gray text-red-600 hover:bg-red-600 hover:text-white dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white flex items-center gap-2 h-10 transition-colors"
+      className="border border-[#00A19B] text-[#00A19B] hover:bg-[#00A19B] hover:text-white dark:text-[#28C9C2] dark:border-[#28C9C2] dark:hover:bg-[#1B4B5A] dark:hover:text-white flex items-center gap-2 h-10 transition-colors"
       onClick={handleLogout}
     >
       Cerrar sesión

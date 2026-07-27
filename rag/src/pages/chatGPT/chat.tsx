@@ -182,7 +182,7 @@ export function Chat({
           },
           ...prev,
         ]);
-        navigate(`/c/${idChat}`);
+        navigate(`/sema/c/${idChat}`);
       }
       setIsLoading(false);
       setFiles([]);
@@ -224,7 +224,7 @@ export function Chat({
         const msgs: ConversationMessage[] = res.messages ?? [];
         if (msgs.length == 0) {
           toast.error(`No existe la conversación ${id}`);
-          navigate("/");
+          navigate("/sema");
           return;
         }
         setAllMsg((prev) => {
@@ -356,7 +356,7 @@ export function Chat({
           {newChat && (
             <div className="flex flex-1 justify-center items-center p-2">
               <h1 className="text-3xl font-bold break-all text-center">
-                ¡Hola, <span className="font-normal">test</span>!
+                ¡Hola, <span className="font-normal"> soy SEMA</span>!
               </h1>
             </div>
           )}

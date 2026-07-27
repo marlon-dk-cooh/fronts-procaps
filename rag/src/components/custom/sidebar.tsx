@@ -33,14 +33,14 @@ export function Sidebar({
   const navigate = useNavigate();
 
   const createNewChat = () => {
-    navigate("/");
+    navigate("/sema");
     if (window.innerWidth < 1024 && isOpen) {
       changeIsOpenNav();
     }
   };
 
   const selectChat = (chatId: string, type: typeChat = "c") => {
-    type == "c" ? navigate(`/c/${chatId}`) : navigate("/sql");
+    type == "c" ? navigate(`/sema/c/${chatId}`) : navigate("/sql");
     if (window.innerWidth < 1024 && isOpen) {
       changeIsOpenNav();
     }
@@ -57,7 +57,7 @@ export function Sidebar({
       .requestDeleteSession(deleteId)
       .then(() => {
         removeChatFromState(deleteId);
-        chatIdParam == deleteId && navigate("/");
+        chatIdParam == deleteId && navigate("/sema");
       })
       .catch((error) => {
         toast.error("Error al eliminar conversación");
@@ -244,7 +244,7 @@ const SideBarItem = ({
       justify-between group
       ${
         active
-          ? "bg-[#fc102850] !text-[#ed1b2e] font-semibold"
+          ? "bg-[#00A19B20] !text-[#00A19B] font-semibold"
           : "bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-700"
       }
       ${isSticky ? "sticky top-0" : ""}

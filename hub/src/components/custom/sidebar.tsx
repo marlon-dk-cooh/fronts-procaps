@@ -1,0 +1,322 @@
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { SquarePen, ChevronRight, Database, Trash2, Pencil, Check, X } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ChatInterface } from "@/interfaces/interfaces";
+import api from "@/api/ApiGPT";
+import UseLogout from "@/hooks/useLogout";
+import ModalConfirmDelete from "../gpt/ModalConfirmDelete";
+import { toast } from "sonner";
+
+interface SidebarProps {
+  isOpen: boolean;
+  changeIsOpenNav: () => void;
+  chats: ChatInterface[];
+  removeChatFromState: (chatId: string) => void;
+  renameChatInState: (chatId: string, newTitle: string) => void;
+  isLoad: boolean;
+}
+type typeChat = "c" | "sql";
+
+export function Sidebar({
+  isOpen,
+  changeIsOpenNav,
+  chats,
+  removeChatFromState,
+  renameChatInState,
+  isLoad,
+}: SidebarProps) {
+  const { id: chatIdParam } = useParams<{ id: string }>();
+  const { logout } = UseLogout();
+  const [openModal, setOpenModal] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState<string>("");
+  const [loadingDelete, setLoadingDelete] = useState(false);
+
+  const navigate = useNavigate();
+
+  const createNewChat = () => {
+    navigate("/sema");
+    if (window.innerWidth < 1024 && isOpen) {
+      changeIsOpenNav();
+    }
+  };
+
+  const selectChat = (chatId: string, type: typeChat = "c") => {
+    type == "c" ? navigate(`/sema/c/${chatId}`) : navigate("/sql");
+    if (window.innerWidth < 1024 && isOpen) {
+      changeIsOpenNav();
+    }
+  };
+
+  const [openProject, setOpenProject] = useState<boolean>(true);
+
+  const onActiveProject = () => setOpenProject((prev: boolean) => !prev);
+
+  const onDeleteConfirm = () => {
+    if (!deleteId) return;
+    setLoadingDelete(true);
+    api
+      .requestDeleteSession(deleteId)
+      .then(() => {
+        removeChatFromState(deleteId);
+        chatIdParam == deleteId && navigate("/sema");
+      })
+      .catch((error) => {
+        toast.error("Error al eliminar conversación");
+        logout(error?.response?.statusText || "");
+      })
+      .finally(() => {
+        setLoadingDelete(false);
+        setOpenModal(false);
+        setDeleteId(null);
+        setDeleteName("");
+      });
+  };
+
+  return (
+    <>
+      <ModalConfirmDelete
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        onConfirm={onDeleteConfirm}
+        title="Eliminar chat"
+        message="¿Seguro que deseas eliminar el siguiente chat?"
+        itemName={deleteName}
+        loading={loadingDelete}
+      />
+
+      <div
+        className={`fixed z-50 lg:relative h-full bg-background gap-2 border-r border-gray-200 dark:border-gray-600 p-2 transition-all flex flex-col overflow-x-hidden
+      ${
+        isOpen
+          ? "lg:w-3/12 w-8/12 top-0"
+          : "w-0 -translate-x-full lg:w-[60px] lg:translate-x-0"
+      }
+    `}
+      >
+        {/* Botón de toggle */}
+        <button onClick={changeIsOpenNav} className="px-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="size-7"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 9h16.5m-16.5 6.75h16.5"
+            />
+          </svg>
+        </button>
+        {/* Crear nueva conversación */}
+        <SideBarItem
+          icon={<SquarePen size={22} />}
+          text={isOpen ? "Nueva conversación" : ""}
+          active={false}
+          onActive={createNewChat}
+        />
+        <div className="flex-1 gap-2 overflow-y-auto">
+          {/* SQL */}
+          <div>
+            <SideBarItem
+              icon={<Database size={22} />}
+              text={isOpen ? "SQL" : ""}
+              active={location.pathname == "/sql"}
+              onActive={() => selectChat("", "sql")}
+              isSticky={true}
+            />
+          </div>
+
+          {/* Lista de chats */}
+          {isLoad && (
+            <>
+              <div className={`space-y-2 animate-pulse`}>
+                {Array(5)
+                  .fill(0)
+                  .map((_, index) => (
+                    <SkeletonItem key={index} />
+                  ))}
+              </div>
+            </>
+          )}
+          <div
+            className={`transition-all duration-400 ease-in-out ${
+              isOpen ? "opacity-100" : "opacity-0"
+            }`}
+            hidden={chats.length == 0}
+          >
+            <button
+              className="text-sm font-semibold p-2 w-full flex justify-start items-center"
+              onClick={onActiveProject}
+            >
+              Chats
+              <div
+                className={`ml-1 transform transition-transform duration-500 ease-in-out ${
+                  openProject ? "rotate-90" : "rotate-0"
+                }`}
+              >
+                <ChevronRight strokeWidth={1.25} size={18} />
+              </div>
+            </button>
+            <div
+              className={`transition-all duration-400 ease-in-out ${
+                openProject ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <div className={`overflow-y-auto transition-all duration-500 ease-in-out`}>
+                {chats
+                  .toSorted(
+                    (a, b) =>
+                      new Date(b.created_at).getTime() -
+                      new Date(a.created_at).getTime()
+                  )
+                  .map(({ chatId, title }) => (
+                    <SideBarItem
+                      key={chatId}
+                      text={title}
+                      active={chatId == chatIdParam}
+                      onActive={() => selectChat(chatId)}
+                      onDelete={() => {
+                        setDeleteId(chatId);
+                        setDeleteName(title);
+                        setOpenModal(true);
+                      }}
+                      onRename={(newTitle) => renameChatInState(chatId, newTitle)}
+                    />
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ===============================
+   COMPONENTE HIJO: SideBarItem
+   =============================== */
+type PropsSideBarItem = {
+  icon?: ReactNode;
+  text: string;
+  active?: boolean;
+  onActive: () => void;
+  isSticky?: boolean;
+  onDelete?: (() => void) | null;
+  onRename?: ((newTitle: string) => void) | null;
+};
+
+const SideBarItem = ({
+  text,
+  icon,
+  active = false,
+  onActive,
+  isSticky = false,
+  onDelete = null,
+  onRename = null,
+}: PropsSideBarItem) => {
+  const itemRef = useRef<HTMLButtonElement | null>(null);
+  const [isStickyActive, setIsStickyActive] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(text);
+
+  useEffect(() => {
+    if (!isSticky || !itemRef.current) return;
+    const el = itemRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsStickyActive(!entry.isIntersecting),
+      { rootMargin: "-1px 0px 0px 0px", threshold: [1] }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isSticky]);
+
+  const confirmRename = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== text) onRename?.(trimmed);
+    setIsEditing(false);
+  };
+
+  const cancelRename = () => {
+    setEditValue(text);
+    setIsEditing(false);
+  };
+
+  const baseClass = `flex flex-row items-center w-full p-2 gap-2 rounded-lg text-sm
+    text-neutral-700 dark:text-neutral-200 font-normal transition-all duration-300 justify-between group
+    ${active ? "bg-[#00A19B20] !text-[#00A19B] font-semibold" : "bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-700"}
+    ${isSticky ? "sticky top-0" : ""}
+    ${isStickyActive ? "border-b border-gray-300 shadow-sm bg-white" : ""}`;
+
+  if (isEditing) {
+    return (
+      <div className={baseClass}>
+        <input
+          autoFocus
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); confirmRename(); }
+            if (e.key === "Escape") cancelRename();
+          }}
+          className="bg-transparent outline-none border-b border-[#00A19B] text-sm w-full min-w-0"
+        />
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={confirmRename}
+            className="p-0.5 text-[#00A19B] hover:opacity-80"
+          >
+            <Check size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={cancelRename}
+            className="p-0.5 text-neutral-400 hover:opacity-80"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      ref={itemRef}
+      className={baseClass}
+      onClick={onActive}
+      style={text ? {} : { placeContent: "center" }}
+    >
+      <div className="flex gap-2 overflow-hidden">
+        {icon && <div className="w-fit flex-shrink-0">{icon}</div>}
+        {text && <span className="truncate">{text}</span>}
+      </div>
+      {(onDelete || onRename) && (
+        <div className="flex gap-1 flex-shrink-0 z-40 hidden group-hover:flex">
+          {onRename && (
+            <Pencil
+              size={15}
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditValue(text); }}
+              className="cursor-pointer text-neutral-400 hover:text-[#00A19B]"
+            />
+          )}
+          {onDelete && (
+            <Trash2
+              size={15}
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="cursor-pointer text-neutral-400 hover:text-red-500"
+            />
+          )}
+        </div>
+      )}
+    </button>
+  );
+};
+
+const SkeletonItem = () => (
+  <div className="h-6 rounded-full w-full bg-gray-300 dark:bg-gray-600" />
+);

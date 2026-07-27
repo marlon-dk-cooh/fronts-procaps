@@ -1,9 +1,8 @@
-// TODO: Reemplaza "AI Chat" con el nombre de tu aplicación.
-// Para usar un logo de imagen: sustituye el <span> por un <img>.
 import { Dispatch } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import { LogoutButton } from "./LogoutButton";
 import { Link } from "react-router-dom";
+import isotipoSrc from "@/assets/isotipo.png";
 
 type Props = {
   setIsOpenNav: Dispatch<React.SetStateAction<boolean>>;
@@ -32,9 +31,9 @@ export const Header = ({ setIsOpenNav }: Props) => {
         </svg>
       </button>
 
-      {/* Logo / Nombre de la app — reemplaza con tu logo */}
       <Link to="/" className="flex items-center gap-2">
-        <span className="text-xl font-bold text-brand-primary">AI Chat</span>
+        <img src={isotipoSrc} alt="SEMA" className="h-8 w-auto" />
+        <span className="text-xl font-bold text-brand-primary">SEMA</span>
       </Link>
 
       <div className="flex flex-row gap-2">

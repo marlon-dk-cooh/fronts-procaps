@@ -11,15 +11,15 @@
        ============================================================ */
 
     /* Color principal de la app (botones, links, énfasis) */
-    --brand-primary: 354 82% 52%;           /* Rojo  #ed1b2e */
+    --brand-primary: 177 100% 32%;           /* Teal  #00A19B */
     --brand-primary-foreground: 0 0% 100%;  /* Texto sobre primario */
 
     /* Color secundario (badges, tags, elementos de apoyo) */
-    --brand-secondary: 220 70% 50%;           /* Azul */
+    --brand-secondary: 199 53% 22%;          /* Navy  #1B4B5A */
     --brand-secondary-foreground: 0 0% 100%;
 
     /* Color de acento (hover, highlights) */
-    --brand-accent: 43 74% 66%;              /* Dorado */
+    --brand-accent: 177 80% 42%;             /* Teal claro */
     --brand-accent-foreground: 0 0% 9%;
 
     /* ============================================================
@@ -61,11 +61,11 @@
        COLORES DE MARCA — Modo oscuro
        Ajusta si necesitas variantes distintas para dark mode
        ============================================================ */
-    --brand-primary: 354 82% 60%;           /* Rojo más claro en dark */
+    --brand-primary: 177 80% 42%;            /* Teal más claro en dark #28C9C2 */
     --brand-primary-foreground: 0 0% 100%;
-    --brand-secondary: 220 70% 60%;
+    --brand-secondary: 199 53% 35%;          /* Navy más claro en dark */
     --brand-secondary-foreground: 0 0% 100%;
-    --brand-accent: 43 74% 66%;
+    --brand-accent: 177 70% 55%;
     --brand-accent-foreground: 0 0% 9%;
 
     /* ============================================================
