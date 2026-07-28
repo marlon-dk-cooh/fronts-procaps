@@ -2,12 +2,9 @@ import {
   DocumentIcon,
   ArrowPathIcon,
   PlayIcon,
-  CheckIcon,
-  PaperClipIcon,
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import type { Report, ReportPhase } from '../interface/Report';
-import { SAMPLE_GROUPS } from '../mock/data';
 import Badge from './Badge';
 
 // Mensajes de barra de progreso.
@@ -78,31 +75,6 @@ export default function DetailPanel({ report, onStart, onWord }: DetailPanelProp
           </button>
         </div>
       )}
-
-      {/* Grupos de documentos */}
-      <div className="px-5 py-4">
-        <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold tracking-[.06em] uppercase text-[#8A969E] dark:text-neutral-500">Grupos de documentos</div>
-          <span className="font-semibold text-[11px] text-[#A7B1B8] dark:text-neutral-500" style={{ fontFamily: "'IBM Plex Mono'" }}>{SAMPLE_GROUPS.length}</span>
-        </div>
-        <div className="mt-3 flex flex-col gap-2 max-h-[340px] overflow-auto">
-          {SAMPLE_GROUPS.map(g => (
-            <div key={g.name} className="flex items-center gap-[11px] px-3 py-[10px] border border-[#EEF0F2] dark:border-neutral-800 rounded-[10px]">
-              <div className="w-[26px] h-[26px] rounded-[7px] bg-[#E6F4F2] dark:bg-[#123326] flex items-center justify-center flex-none">
-                <CheckIcon className="w-3 h-3 text-[#0F8B81] dark:text-[#4ADE94] stroke-[2.5]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-[#26343B] dark:text-neutral-100">{g.name}</div>
-                <div className="text-[11.5px] text-[#8A969E] dark:text-neutral-500">{g.doc}</div>
-              </div>
-              <span className="inline-flex items-center gap-[5px] px-2 py-[3px] bg-[#F2F4F6] dark:bg-neutral-800 rounded-[7px] font-medium text-[11px] text-[#6B7780] dark:text-neutral-400 flex-none">
-                <PaperClipIcon className="w-[11px] h-[11px] text-[#8A969E] dark:text-neutral-500" />
-                {g.files}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Documento Word generado */}
       {report.hasWord && (

@@ -9,7 +9,7 @@ import {
   BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import type { WizardForm } from '../interface/Report';
-import { METHODS } from '../mock/data';
+import { METHODS } from '../config/methods';
 
 type ScalarKey = 'nombreReporte' | 'codigoInforme' | 'nombreProducto' | 'codigoProducto'
   | 'ingredientes' | 'rango' | 'protocolo' | 'hojas' | 'bitacoras';

@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTheme } from '@/context/ThemeContext';
 import type { WizardForm } from '../interface/Report';
-import { METHODS } from '../mock/data';
+import { METHODS } from '../config/methods';
 
 type ScalarKey = 'nombreReporte' | 'codigoInforme' | 'nombreProducto' | 'codigoProducto'
   | 'ingredientes' | 'rango' | 'protocolo' | 'hojas' | 'bitacoras';

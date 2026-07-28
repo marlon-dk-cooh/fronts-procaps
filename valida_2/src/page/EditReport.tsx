@@ -6,7 +6,7 @@ import WizardShell from '../components/WizardShell';
 
 interface Props {
   reports: Report[];
-  updateReport: (id: string, patch: Partial<Report>) => void;
+  renameReport: (id: string, nombreReporte: string) => Promise<void>;
 }
 
 function reportToForm(r: Report): WizardForm {
@@ -18,7 +18,7 @@ function reportToForm(r: Report): WizardForm {
   };
 }
 
-export default function EditReport({ reports, updateReport }: Props) {
+export default function EditReport({ reports, renameReport }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id') ?? '';
@@ -43,13 +43,16 @@ export default function EditReport({ reports, updateReport }: Props) {
     );
   }
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form.hojas && !form.bitacoras) { setShowErrors(true); return; }
-    updateReport(id, {
-      name:    form.nombreReporte || id,
-      product: form.nombreProducto || '—',
-    });
-    navigate(`/?id=${encodeURIComponent(id)}`);
+    try {
+      // Sólo el nombre es editable en Cosmos (PATCH /valida/run/{id}).
+      await renameReport(id, form.nombreReporte || id);
+      navigate(`/?id=${encodeURIComponent(id)}`);
+    } catch (err) {
+      console.error('[VALIDA] rename report failed:', err);
+      window.alert(`No se pudo guardar el informe.\n\n${(err as Error).message}`);
+    }
   };
 
   return (

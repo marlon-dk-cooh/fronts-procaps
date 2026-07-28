@@ -14,7 +14,7 @@ function reportToForm(r: Report): WizardForm {
 }
 
 export default function EditReport() {
-  const { reports, updateReport } = useOutletContext<ValidaOutletContext>();
+  const { reports, renameReport } = useOutletContext<ValidaOutletContext>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id') ?? '';
@@ -39,13 +39,16 @@ export default function EditReport() {
     );
   }
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form.hojas && !form.bitacoras) { setShowErrors(true); return; }
-    updateReport(id, {
-      name:    form.nombreReporte || id,
-      product: form.nombreProducto || '—',
-    });
-    navigate(`/valida?id=${encodeURIComponent(id)}`);
+    try {
+      // Sólo el nombre es editable en Cosmos (PATCH /valida/run/{id}).
+      await renameReport(id, form.nombreReporte || id);
+      navigate(`/valida?id=${encodeURIComponent(id)}`);
+    } catch (err) {
+      console.error('[VALIDA] rename report failed:', err);
+      window.alert(`No se pudo guardar el informe.\n\n${(err as Error).message}`);
+    }
   };
 
   return (
