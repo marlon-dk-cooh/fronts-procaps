@@ -25,6 +25,7 @@ import {
 } from "@/interfaces/interfaces";
 import ListFile from "@/components/custom/ListFile";
 import { Button } from "@/components/ui/button";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import UseLogout from "@/hooks/useLogout";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -491,8 +492,8 @@ export function Chat({
               </Fragment>
             ))}
           {isLoading && (
-            <div className="text-center text-gray-500 italic">
-              ⏳ Pensando...
+            <div className="w-full max-w-xl">
+              <ProgressBar label="Pensando..." />
             </div>
           )}
           <div ref={endRef} />
