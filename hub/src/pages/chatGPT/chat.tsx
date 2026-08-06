@@ -45,6 +45,42 @@ const SEMA_POLL_INTERVAL_MS = 2500;
 /** Tope de seguridad: si el backend nunca llega a un estado terminal, se corta. */
 const SEMA_POLL_TIMEOUT_MS = 45 * 60 * 1000;
 
+/**
+ * El run_id vivía sólo dentro del closure de handleSubmit, así que un F5 a mitad
+ * de proceso dejaba la barra muerta aunque el backend siguiera trabajando y
+ * terminara bien. Guardarlo por sesión permite reanudar el polling al montar.
+ *
+ * sessionStorage y no localStorage: el run pertenece a esta pestaña y no tiene
+ * sentido arrastrarlo semanas. Si falta (pestaña nueva, storage limpiado), se
+ * cae al endpoint /active-run, que sí lo sabe.
+ */
+const activeRunKey = (sessionId: string) => `sema:active-run:${sessionId}`;
+
+const readStoredRun = (sessionId: string): string | null => {
+  try {
+    return sessionStorage.getItem(activeRunKey(sessionId));
+  } catch {
+    // Modo privado o storage deshabilitado: se pierde la reanudación, nada más.
+    return null;
+  }
+};
+
+const storeRun = (sessionId: string, runId: string) => {
+  try {
+    sessionStorage.setItem(activeRunKey(sessionId), runId);
+  } catch {
+    /* idem */
+  }
+};
+
+const clearStoredRun = (sessionId: string) => {
+  try {
+    sessionStorage.removeItem(activeRunKey(sessionId));
+  } catch {
+    /* idem */
+  }
+};
+
 type props = {
   newChat?: boolean;
   setChats: Dispatch<SetStateAction<ChatInterface[]>>;
@@ -98,11 +134,17 @@ export function Chat({
    * configurable. El backend los ejecuta en segundo plano y aquí se sigue su
    * avance, que además es lo que llena la barra de progreso.
    */
-  const pollSemaRun = async (runId: string): Promise<SemaRunStatus> => {
+  const pollSemaRun = async (
+    runId: string,
+    isCancelled?: () => boolean
+  ): Promise<SemaRunStatus> => {
     const startedAt = Date.now();
 
     for (;;) {
-      if (pollAbort.current || isStop.current) {
+      // `isCancelled` es propio de cada reanudación. `pollAbort` no alcanza ahí:
+      // vuelve a false al remontar, así que un bucle viejo reviviría y publicaría
+      // la respuesta por duplicado.
+      if (pollAbort.current || isStop.current || isCancelled?.()) {
         throw new Error("cancelado por el usuario");
       }
       if (Date.now() - startedAt > SEMA_POLL_TIMEOUT_MS) {
@@ -134,6 +176,66 @@ export function Chat({
       }
 
       await new Promise((resolve) => setTimeout(resolve, SEMA_POLL_INTERVAL_MS));
+    }
+  };
+
+  /**
+   * Retoma un run que quedó corriendo y publica su resultado.
+   *
+   * Se usa al montar tras un refresh: el backend nunca dejó de trabajar, lo
+   * único que se perdió fue el hilo del navegador.
+   */
+  const resumeSemaRun = async (
+    sessionId: string,
+    runId: string,
+    isCancelled: () => boolean
+  ) => {
+    setIsLoading(true);
+    setRunProgress({ label: "Retomando el proceso..." });
+    try {
+      const status = await pollSemaRun(runId, isCancelled);
+      const resumedId = status.message_id || runId;
+
+      // Al terminar, el backend ya guardó el intercambio en el historial. Si la
+      // carga del historial llega después de esto, el mensaje vendría por ambos
+      // lados; se inserta sólo si no está ya presente.
+      setAllMsg((prev: any) => {
+        const current = prev[sessionId] || [];
+        if (current.some((m: Message) => m.id === resumedId)) return prev;
+        return {
+          ...prev,
+          [sessionId]: [
+            ...current,
+            {
+              id: resumedId,
+              answer: status.text,
+              role: "assistant",
+              files: [],
+              rate: null,
+              artifacts: status.artifacts || [],
+            },
+          ],
+        };
+      });
+    } catch (error: any) {
+      // Desmontar el componente aborta el polling: no es un fallo del proceso y
+      // el run debe seguir siendo recuperable en el próximo montaje.
+      if (pollAbort.current || isCancelled()) return;
+
+      const detail =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Hubo un error al procesar tu mensaje.";
+      pushMessage(
+        { id: uuidv4(), answer: `⚠️ ${detail}`, role: "assistant", files: [], rate: null },
+        sessionId
+      );
+    } finally {
+      if (!pollAbort.current && !isCancelled()) {
+        clearStoredRun(sessionId);
+        setIsLoading(false);
+        setRunProgress({ label: "Pensando..." });
+      }
     }
   };
 
@@ -240,7 +342,18 @@ export function Chat({
           setRunProgress({ value: 0, label: "Enviando los documentos..." });
 
           const accepted = await api.requestSemaRun(formData);
-          const status = await pollSemaRun(accepted.run_id);
+          // Se guarda ANTES de empezar a esperar: si el usuario refresca a los
+          // dos segundos, el run ya es recuperable.
+          storeRun(activeSessionId, accepted.run_id);
+
+          let status: SemaRunStatus;
+          try {
+            status = await pollSemaRun(accepted.run_id);
+          } finally {
+            // Si se abortó por desmontaje, el run sigue vivo: conservar el
+            // puntero es lo que permite retomarlo al volver.
+            if (!pollAbort.current) clearStoredRun(activeSessionId);
+          }
 
           assistantText = status.text;
           assistantArtifacts = status.artifacts || [];
@@ -404,16 +517,59 @@ export function Chat({
     }));
   };
 
+  // Evita que el doble montaje de StrictMode dispare dos reanudaciones.
+  const resumedFor = useRef<string | null>(null);
+
   useEffect(() => {
     setIdChat(id || uuidv4());
-    if (id) {
-      getMessages(id);
+    if (!id) return;
+
+    getMessages(id);
+
+    if (resumedFor.current === id) return;
+    resumedFor.current = id;
+
+    // Token de cancelación propio de esta reanudación (ver pollSemaRun).
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+
+    // Camino normal (mismo navegador): el run_id está en sessionStorage y la
+    // barra vuelve sin pedirle nada al backend.
+    const storedRun = readStoredRun(id);
+    if (storedRun) {
+      resumeSemaRun(id, storedRun, isCancelled);
+    } else {
+      // Sólo si no hay copia local se pregunta al backend. Es un caso de borde
+      // (pestaña nueva, storage limpiado), no el camino de todos los montajes.
+      api
+        .requestSemaActiveRun(id)
+        .then((res) => {
+          if (cancelled) return;
+          if (res.active && res.run_id) {
+            storeRun(id, res.run_id);
+            resumeSemaRun(id, res.run_id, isCancelled);
+          }
+        })
+        .catch(() => {
+          // Sin recuperación el usuario queda como antes de este cambio: sin
+          // barra. No amerita molestarlo con un error.
+        });
     }
+
+    // Desmontar aborta el polling en curso, así que el próximo montaje debe
+    // poder reanudar otra vez (es exactamente lo que hace StrictMode en dev).
+    return () => {
+      cancelled = true;
+      resumedFor.current = null;
+    };
   }, [id]);
 
   const handleStop = async () => {
     isStop.current = true;
     setIsLoading(false);
+    // El run sigue vivo en el backend; esto sólo evita que la próxima carga de
+    // la página lo retome, que es justo lo que el usuario acaba de descartar.
+    clearStoredRun(idChat);
     pushMessage({
       id: uuidv4(),
       answer: "El mesaje fue cancelado por el usuario",

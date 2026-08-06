@@ -1,0 +1,36 @@
+trigger:
+  branches:
+    include:
+      - desarrollo
+    exclude:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  azureServiceConnection: 'Procaps-conexion'
+  resourceGroup: 'AZ-RG-PROCAPS-Dev-ServiciosCognitivos'
+  containerAppName: 'azcrprocapsdevservicios'
+  acrName: 'azcrprocapsdevservicios'
+  acrLoginServer: 'azcrprocapsdevservicios.azurecr.io'
+  imageRepository: 'ai-hub'
+  imageTag: '$(Build.BuildId)'
+  imageName: '$(acrLoginServer)/$(imageRepository):$(imageTag)'
+
+- task: DockerCompose@1
+  inputs:
+    containerregistrytype: 'Azure Container Registry'
+    azureContainerRegistry: '{"loginServer":"azcrprocapsdevservicios.azurecr.io", "id" : "/subscriptions/6c39d688-4bac-4fe5-85f2-11e39fb7fb4a/resourceGroups/AZ-RG-PROCAPS-Dev-ServiciosCognitivos/providers/Microsoft.ContainerRegistry/registries/azcrprocapsdevservicios"}'
+    dockerComposeFile: '**/docker-compose.yml'
+    action: 'Run a Docker Compose command'
+
+- task: AzureRmWebAppDeployment@5
+  inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Procaps-conexion'
+    appType: 'webAppContainer'
+    WebAppName: 'az-app-procaps-dev'
+    DockerNamespace: 'azcrprocapsdevservicios'
+    DockerRepository: 'ai-hub'
+    DockerImageTag: 'latest'

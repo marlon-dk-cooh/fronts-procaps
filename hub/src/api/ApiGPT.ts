@@ -73,6 +73,13 @@ export interface SemaRunStatus {
   error_type: string;
 }
 
+/** Run en curso de una sesión: permite recuperar la barra tras un refresh. */
+export interface SemaActiveRun {
+  active: boolean;
+  run_id: string;
+  status: string;
+}
+
 /** Flujos que corren en segundo plano por exceder el límite de 240 s del ingress. */
 const ASYNC_SEMA_FLOWS = new Set(["am-bom-extractor", "bd-bom-builder"]);
 
@@ -222,6 +229,26 @@ const realApi = {
   async requestSemaRunStatus(run_id: string): Promise<SemaRunStatus> {
     const response: ApiResponse<SemaRunStatus> = await apiClientCommon.get(
       `/sema/run/${encodeURIComponent(run_id)}/status`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Pregunta si la sesión tiene un run SEMA todavía en curso.
+   *
+   * Red de seguridad para la barra de progreso: solo se llama cuando el
+   * sessionStorage no tiene el run_id (pestaña nueva, storage limpiado, otro
+   * dispositivo). En el caso normal el refresh se resuelve sin tocar la red.
+   */
+  async requestSemaActiveRun(session_id: string): Promise<SemaActiveRun> {
+    const response: ApiResponse<SemaActiveRun> = await apiClientCommon.get(
+      `/sema/session/${encodeURIComponent(session_id)}/active-run`,
       {
         headers: {
           "Content-Type": "application/json",

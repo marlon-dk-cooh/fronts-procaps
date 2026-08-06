@@ -139,6 +139,12 @@ const mockApi = {
     };
   },
 
+  async requestSemaActiveRun(_session_id: string): Promise<any> {
+    await delay(100);
+    // En modo mock nunca hay un run que recuperar: el refresh arranca limpio.
+    return { active: false, run_id: "", status: "" };
+  },
+
   async downloadSemaArtifact(_path: string, _filename?: string): Promise<void> {
     await delay(200);
     // En modo mock no hay archivo real que descargar.
