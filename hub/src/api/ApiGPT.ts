@@ -41,6 +41,45 @@ interface ApiResponse<T = any> {
   data: T;
 }
 
+/** Excel descargable generado por un flujo SEMA. */
+export interface SemaArtifact {
+  name: string;
+  path: string;
+  kind?: string;
+}
+
+/** 202 de POST /sema/run: el flujo quedó corriendo en segundo plano. */
+export interface SemaRunAccepted {
+  run_id: string;
+  session_id: string;
+  message_id: string;
+  status: string;
+}
+
+/** Estado de un run: alimenta la barra de progreso y trae el resultado final. */
+export interface SemaRunStatus {
+  run_id: string;
+  session_id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "canceled";
+  phase: string;
+  progress: number;
+  detail: string;
+  items_done: number;
+  items_total: number;
+  current_item: string;
+  message_id: string;
+  text: string;
+  artifacts: SemaArtifact[];
+  error_type: string;
+}
+
+/** Flujos que corren en segundo plano por exceder el límite de 240 s del ingress. */
+const ASYNC_SEMA_FLOWS = new Set(["am-bom-extractor", "bd-bom-builder"]);
+
+export function isAsyncSemaFlow(modelName: string): boolean {
+  return ASYNC_SEMA_FLOWS.has((modelName || "").trim().toLowerCase());
+}
+
 // Normalises a raw CosmosDB session document to the shape the frontend expects:
 // { id, conversation_name, created_at, ... }
 function normaliseSession(s: any) {
@@ -161,6 +200,60 @@ const realApi = {
       { headers: { Authorization: `Bearer ${getAuthToken()}` } }
     );
     return response.data;
+  },
+
+  /**
+   * Lanza un flujo SEMA pesado en segundo plano.
+   *
+   * El ingress de Azure Container Apps corta toda petición a los 240 s y no es
+   * configurable, así que am-bom-extractor y bd-bom-builder (OCR + decenas de
+   * llamadas al LLM, minutos de trabajo) no caben en /attachment. Esto devuelve
+   * 202 de inmediato; el avance se consulta con requestSemaRunStatus.
+   */
+  async requestSemaRun(attachment: FormData): Promise<SemaRunAccepted> {
+    const response: ApiResponse<SemaRunAccepted> = await apiClientMultipart.post(
+      "/sema/run",
+      attachment,
+      { headers: { Authorization: `Bearer ${getAuthToken()}` } }
+    );
+    return response.data;
+  },
+
+  async requestSemaRunStatus(run_id: string): Promise<SemaRunStatus> {
+    const response: ApiResponse<SemaRunStatus> = await apiClientCommon.get(
+      `/sema/run/${encodeURIComponent(run_id)}/status`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Descarga un Excel generado por SEMA.
+   *
+   * El endpoint exige cabecera Authorization, así que un <a href> directo no
+   * sirve: hay que traer el blob y disparar la descarga a mano (mismo patrón
+   * que downloadReport en valida/services/validaApi.ts).
+   */
+  async downloadSemaArtifact(path: string, filename?: string): Promise<void> {
+    const response = await apiClientCommon.get("/sema/artifact", {
+      params: { path },
+      responseType: "blob",
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+
+    const url = URL.createObjectURL(response.data as Blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename || path.split("/").pop() || "archivo.xlsx";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   },
 
   async requestRenameSession(session_id: string, new_title: string): Promise<any> {

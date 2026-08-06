@@ -24,6 +24,8 @@ const MODELS: Option[] = [
   }
 ];
 
+export const DEFAULT_MODEL = MODELS[0].value;
+
 type Props = {
   setValue: React.Dispatch<React.SetStateAction<string>>;
   value: string;
@@ -33,15 +35,12 @@ export default function DropdownModel({ value, setValue }: Props) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Inicializar desde localStorage
   useEffect(() => {
     const saved = localStorage.getItem("model");
-    if (saved) {
-      setValue(saved);
-    } else {
-      setValue("gpt-4o");
-      localStorage.setItem("model", "gpt-4o");
-    }
+    const isValid = saved && MODELS.some((m) => m.value === saved);
+    const next = isValid ? (saved as string) : DEFAULT_MODEL;
+    setValue(next);
+    localStorage.setItem("model", next);
   }, [setValue]);
 
   // Cerrar al hacer clic fuera
@@ -112,7 +111,7 @@ export default function DropdownModel({ value, setValue }: Props) {
           className="inline-flex items-center justify-center border border-input bg-background hover:opacity-70 hover:text-accent-foreground h-10 px-4 py-2 text-sm font-medium rounded-md transition"
           type="button"
         >
-          {current?.label ?? "GPT-4o"}
+          {current?.label ?? MODELS[0].label}
           <svg
             className={`w-4 h-4 ms-1.5 -me-0.5 transition-transform ${
               open ? "rotate-180" : "rotate-0"

@@ -6,6 +6,7 @@ import React, {
   Dispatch,
   SetStateAction,
 } from "react";
+import { DEFAULT_MODEL } from "@/components/gpt/DropdownModel";
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -22,9 +23,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return savedTheme === "dark";
   });
 
+  // Por defecto un flujo SEMA real: cualquier otro valor hace que el backend
+  // enrute al agente genérico y los PDFs se procesen como texto plano.
   const [modelSelect, setModelSelect] = useState(() => {
-    const savedModel = localStorage.getItem("model");
-    return savedModel ? savedModel : "gpt-4o";
+    return localStorage.getItem("model") || DEFAULT_MODEL;
   });
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);

@@ -13,11 +13,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Copy, Pencil, X, Check, RefreshCwIcon } from "lucide-react";
+import { Copy, Pencil, X, Check, RefreshCwIcon, Download } from "lucide-react";
 import { toast } from "sonner";
 import { ThumbDownIcon, ThumbUpIcon } from "@/components/custom/icons";
 import { InputGPT } from "@/components/gpt/InputGPT";
-import api from "@/api/ApiGPT";
+import api, { isAsyncSemaFlow } from "@/api/ApiGPT";
+import type { SemaArtifact, SemaRunStatus } from "@/api/ApiGPT";
 import {
   ChatInterface,
   ConversationDetailResponse,
@@ -35,7 +36,14 @@ interface Message {
   answer: string;
   files: File[] | string[] | null;
   rate: null | number;
+  /** Excels generados por un flujo SEMA, ofrecidos como botones de descarga. */
+  artifacts?: SemaArtifact[];
 }
+
+/** Cada cuánto se consulta el avance de un run SEMA en segundo plano. */
+const SEMA_POLL_INTERVAL_MS = 2500;
+/** Tope de seguridad: si el backend nunca llega a un estado terminal, se corta. */
+const SEMA_POLL_TIMEOUT_MS = 45 * 60 * 1000;
 
 type props = {
   newChat?: boolean;
@@ -68,6 +76,74 @@ export function Chat({
   const isStop = useRef<boolean>(false);
   const { logout, user } = UseLogout();
   const { modelSelect } = useTheme();
+  // Avance del run SEMA en segundo plano; alimenta la ProgressBar.
+  const [runProgress, setRunProgress] = useState<{ value?: number; label: string }>({
+    label: "Pensando...",
+  });
+  // Permite cancelar el polling si el componente se desmonta a mitad de un run.
+  const pollAbort = useRef<boolean>(false);
+
+  useEffect(() => {
+    pollAbort.current = false;
+    return () => {
+      pollAbort.current = true;
+    };
+  }, []);
+
+  /**
+   * Consulta el estado de un run SEMA hasta que termina.
+   *
+   * Los flujos am-bom-extractor y bd-bom-builder no caben en una petición
+   * síncrona: el ingress de Container Apps corta a los 240 s y no es
+   * configurable. El backend los ejecuta en segundo plano y aquí se sigue su
+   * avance, que además es lo que llena la barra de progreso.
+   */
+  const pollSemaRun = async (runId: string): Promise<SemaRunStatus> => {
+    const startedAt = Date.now();
+
+    for (;;) {
+      if (pollAbort.current || isStop.current) {
+        throw new Error("cancelado por el usuario");
+      }
+      if (Date.now() - startedAt > SEMA_POLL_TIMEOUT_MS) {
+        throw new Error("El proceso tardó más de lo esperado. Vuelve a intentarlo.");
+      }
+
+      let status: SemaRunStatus;
+      try {
+        status = await api.requestSemaRunStatus(runId);
+      } catch (err: any) {
+        // Un fallo puntual de red no debe abortar un proceso de varios minutos;
+        // sólo un 404/403 significa que ese run ya no es consultable.
+        const code = err?.response?.status;
+        if (code === 404 || code === 403 || code === 400) throw err;
+        await new Promise((resolve) => setTimeout(resolve, SEMA_POLL_INTERVAL_MS));
+        continue;
+      }
+
+      setRunProgress({
+        value: status.progress,
+        label: status.detail || "Procesando...",
+      });
+
+      if (status.status === "succeeded") return status;
+      if (status.status === "failed" || status.status === "canceled") {
+        throw new Error(
+          status.detail || "No se pudo completar el procesamiento. Vuelve a intentarlo."
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, SEMA_POLL_INTERVAL_MS));
+    }
+  };
+
+  const handleDownloadArtifact = async (artifact: SemaArtifact) => {
+    try {
+      await api.downloadSemaArtifact(artifact.path, artifact.name);
+    } catch {
+      toast?.error("No se pudo descargar el archivo. Intenta de nuevo.");
+    }
+  };
 
   const pushMessage = (msg: Message, chatKey?: string) => {
     const key = chatKey ?? idChat;
@@ -140,6 +216,9 @@ export function Chat({
 
     try {
       let assistantText = "";
+      let assistantArtifacts: SemaArtifact[] = [];
+      let assistantMessageId = messageId;
+
       if (files?.length) {
         const formData = new FormData();
         formData.append("message_id", messageId);
@@ -154,8 +233,23 @@ export function Chat({
           formData.append("files", fileObj);
         });
 
-        const res = await api.requestAttachment(formData);
-        assistantText = res.text;
+        if (isAsyncSemaFlow(modelSelect)) {
+          // Flujo pesado: se acepta con 202 y se sigue por polling. `client_run_id`
+          // es la clave de idempotencia: un reintento no dispara un segundo OCR.
+          formData.append("client_run_id", messageId);
+          setRunProgress({ value: 0, label: "Enviando los documentos..." });
+
+          const accepted = await api.requestSemaRun(formData);
+          const status = await pollSemaRun(accepted.run_id);
+
+          assistantText = status.text;
+          assistantArtifacts = status.artifacts || [];
+          assistantMessageId = status.message_id || accepted.message_id || messageId;
+        } else {
+          const res = await api.requestAttachment(formData);
+          assistantText = res.text;
+          assistantArtifacts = res.artifacts || [];
+        }
       } else {
         const res = await api.requestChat(
           text,
@@ -167,6 +261,8 @@ export function Chat({
           titleChat
         );
         assistantText = res.text;
+        // bom-planner también genera un Excel y responde por /message.
+        assistantArtifacts = res.artifacts || [];
       }
 
       if (isStop.current) {
@@ -174,10 +270,33 @@ export function Chat({
         return;
       }
 
-      pushMessage({ id: messageId, answer: assistantText, role: "assistant", files: [], rate: null }, activeSessionId);
+      pushMessage(
+        {
+          id: assistantMessageId,
+          answer: assistantText,
+          role: "assistant",
+          files: [],
+          rate: null,
+          artifacts: assistantArtifacts,
+        },
+        activeSessionId
+      );
     } catch (error: any) {
-      logout(error?.response?.statusText || "");
-      pushMessage({ id: messageId, answer: "Hubo un error al procesar tu mensaje.", role: "assistant", files: [], rate: null }, activeSessionId);
+      // Sólo un problema de credenciales justifica cerrar la sesión. Antes
+      // cualquier error (un 422, un 500 transitorio) expulsaba al usuario.
+      const statusCode = error?.response?.status;
+      if (statusCode === 401 || statusCode === 403) {
+        logout(error?.response?.statusText || "");
+      }
+
+      const detail =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Hubo un error al procesar tu mensaje.";
+      pushMessage(
+        { id: messageId, answer: `⚠️ ${detail}`, role: "assistant", files: [], rate: null },
+        activeSessionId
+      );
     } finally {
       if (newChat) {
         setChats((prev) => [
@@ -187,6 +306,7 @@ export function Chat({
         navigate(`/sema/c/${activeSessionId}`);
       }
       setIsLoading(false);
+      setRunProgress({ label: "Pensando..." });
       setFiles([]);
     }
   };
@@ -455,6 +575,27 @@ export function Chat({
                         {msg.answer}
                       </ReactMarkdown>
                     </div>
+
+                    {/* Excels generados por SEMA. El endpoint de descarga exige
+                        cabecera Authorization, así que no puede ser un <a href>:
+                        se trae el blob y se dispara la descarga desde JS. */}
+                    {msg.artifacts && msg.artifacts.length > 0 && (
+                      <div className="flex flex-row flex-wrap gap-2 my-2 max-w-8/12">
+                        {msg.artifacts.map((artifact) => (
+                          <Button
+                            key={artifact.path}
+                            variant="outline"
+                            className="h-fit gap-2 px-3 py-2 rounded-xl text-xs"
+                            title={artifact.name}
+                            onClick={() => handleDownloadArtifact(artifact)}
+                          >
+                            <Download size={14} />
+                            <span className="truncate max-w-[16rem]">{artifact.name}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex flex-row">
                       <Button
                         variant="outline"
@@ -493,7 +634,14 @@ export function Chat({
             ))}
           {isLoading && (
             <div className="w-full max-w-xl">
-              <ProgressBar label="Pensando..." />
+              {/* Con `value` la barra pasa a modo determinado: el porcentaje sale
+                  del avance real del pipeline (OCR, extracción, render), no de
+                  una animación simulada. */}
+              <ProgressBar
+                value={runProgress.value}
+                label={runProgress.label}
+                showValue
+              />
             </div>
           )}
           <div ref={endRef} />

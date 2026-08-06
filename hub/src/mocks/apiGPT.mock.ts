@@ -9,6 +9,9 @@ import {
   delay,
   getNextChatResponse,
 } from "./data";
+9
+// Avance simulado del run asíncrono: cada consulta de estado adelanta una fase.
+let mockRunTick = 0;
 
 const mockApi = {
   async requestCreateSession(_name?: string): Promise<any> {
@@ -70,6 +73,75 @@ const mockApi = {
   ): Promise<any> {
     await delay(300);
     return { success: true };
+  },
+
+  // --- Ejecución asíncrona de SEMA -------------------------------------------
+  // Simula el ciclo 202 -> polling -> resultado, para poder ver la barra de
+  // progreso y los botones de descarga sin backend.
+
+  async requestSemaRun(_attachment: any): Promise<any> {
+    await delay(400);
+    mockRunTick = 0;
+    return {
+      run_id: "sema-mock-0001",
+      session_id: "mock-session",
+      message_id: "msg-mock-0001",
+      status: "queued",
+    };
+  },
+
+  async requestSemaRunStatus(run_id: string): Promise<any> {
+    await delay(200);
+    mockRunTick += 1;
+
+    const steps = [
+      { phase: "ocr", progress: 12, detail: "Leyendo el documento (OCR) (14 s)" },
+      { phase: "ocr", progress: 26, detail: "Leyendo el documento (OCR) (38 s)" },
+      { phase: "metadata", progress: 34, detail: "Identificando el método" },
+      { phase: "structure_tests", progress: 58, detail: "Estructurando las pruebas (3/5)" },
+      { phase: "extract_insumos", progress: 81, detail: "Extrayendo insumos (7/9)" },
+      { phase: "render", progress: 93, detail: "Generando el Excel" },
+    ];
+
+    if (mockRunTick <= steps.length) {
+      const step = steps[mockRunTick - 1];
+      return {
+        run_id, session_id: "mock-session", status: "running",
+        items_done: 0, items_total: 0, current_item: "",
+        message_id: "", text: "", artifacts: [], error_type: "",
+        ...step,
+      };
+    }
+
+    return {
+      run_id,
+      session_id: "mock-session",
+      status: "succeeded",
+      phase: "done",
+      progress: 100,
+      detail: "Listo",
+      items_done: 0,
+      items_total: 0,
+      current_item: "",
+      message_id: "msg-mock-0001",
+      text:
+        "Listo, ya terminé de procesar metodo_4280.pdf y tu archivo está disponible para descargar.\n\n" +
+        "Procesamiento completado del método MA-0157 V3 (Acetaminofén Tabletas 500 mg).\n" +
+        "- Pruebas estructuradas: 5\n- Insumos extraídos: 34 (28 únicos)",
+      artifacts: [
+        {
+          name: "619021289_Acetaminofen_20260805.xlsx",
+          path: "processes/source=extract/year=2026/month=08/day=05/bom/619021289.xlsx",
+          kind: "excel",
+        },
+      ],
+      error_type: "",
+    };
+  },
+
+  async downloadSemaArtifact(_path: string, _filename?: string): Promise<void> {
+    await delay(200);
+    // En modo mock no hay archivo real que descargar.
   },
 };
 
