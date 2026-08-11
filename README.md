@@ -1,104 +1,188 @@
-# ai-frontend-templates
+# Agentes | Procaps — Interfaz de chat
 
-Colección de plantillas frontend listas para conectar con backends de IA. Cada plantilla incluye mocks de datos, sistema de colores personalizable y puntos de conexión claramente marcados.
+Interfaz web del asistente conversacional de Procaps. La aplicación expone una
+sola experiencia de chat en la raíz (`/`), más la herramienta de consultas SQL
+en `/sql`.
+
+**Stack:** React 18 + TypeScript + Vite + Tailwind CSS + Radix UI.
+
+## Funcionalidades
+
+- **Chat** (`/`) — conversaciones con historial, archivos adjuntos, edición de
+  mensajes enviados y regeneración de respuestas.
+- **Agente SQL** (`/sql`) — preguntas en lenguaje natural traducidas a SQL, con
+  tabla de resultados y gráficas.
+- **Gestión de conversaciones** — crear, renombrar y eliminar desde la barra
+  lateral.
+- **Modo claro / oscuro** — se cambia desde el menú de usuario y se conserva en
+  `localStorage`.
+- **Selector de LLM** — proveedor del modelo, junto al campo de mensaje.
 
 ---
 
-## Plantillas disponibles
-
-### 1. `rag/` — Chat RAG + Agente SQL
-
-Chat conversacional con historial y un agente de consultas SQL en lenguaje natural.
-
-
-
-**Stack:** React 18 · TypeScript · Vite · Tailwind CSS · Shadcn/Radix UI
-
-| Característica | Detalle |
-|---|---|
-| Chat RAG | Conversaciones con historial, archivos adjuntos, votos |
-| Agente SQL | Lenguaje natural → SQL, tablas y gráficas de resultados |
-| Mocks | `VITE_USE_MOCKS=true` activa datos de prueba sin backend |
-| Colores | Variables `--brand-primary/secondary/accent` en `index.css` |
-| Auth | Stub listo para conectar (MSAL, Auth0, JWT, Keycloak) |
+## Inicio rápido (desarrollo)
 
 ```bash
-cd rag && npm install && npm run dev
+npm install
+cp .env.example .env    # completa las URLs de tu backend
+npm run dev             # http://localhost:8501
 ```
 
-→ Ver [rag/README.md](rag/README.md)
+Para trabajar sin backend, deja `VITE_USE_MOCKS=true`: la app responde con los
+datos de prueba de `src/mocks/`.
 
 ---
 
-### 2. `search-engine/` — Búsqueda Semántica
+## Configuración
 
-| | |
+### 1. Variables de entorno
+
+Todas las variables se leen **en tiempo de build**, no en tiempo de ejecución:
+Vite las incrusta en el bundle. Cambiar una variable exige reconstruir la imagen.
+
+| Variable | Obligatoria | Descripción |
+|---|---|---|
+| `VITE_APP_API_URL_GPT` | Sí | Base del backend de chat, incluyendo `/api/v1`. |
+| `VITE_APP_API_URL_SQL` | Sí | Host del backend SQL **sin** ruta: `ApiSQL.ts` añade `/api`. |
+| `VITE_CATALOG` | No | Catálogo de Unity Catalog por defecto en el chat SQL. |
+| `VITE_USE_MOCKS` | No | `true` usa datos simulados; en despliegue debe ser `false`. |
+
+> **Precedencia:** las variables presentes en el entorno del proceso (las que
+> inyecta Docker con `--build-arg`) tienen prioridad sobre el archivo `.env`
+> incluido en el repositorio. En despliegue, pasa siempre las URLs por
+> `--build-arg` y no dependas del `.env` versionado.
+
+### 2. Autenticación
+
+La plantilla **no trae un proveedor de autenticación activo**. El token se
+centraliza en `src/utils/auth.ts` y se envía como `Authorization: Bearer` en
+cada petición. Hay que conectar tres puntos, marcados con `TODO`:
+
+| Archivo | Qué conectar |
 |---|---|
-| ![Búsqueda](search-engine/image/screen_1.png) | ![Resultados](search-engine/image/screen_2.png) |
+| `src/utils/auth.ts` | `getAuthToken()` — devolver el token de tu proveedor. |
+| `src/pages/login/Login.tsx` | `handleLogin()` — llamar a tu API de login y guardar el token. |
+| `src/hooks/useLogout.tsx` | `logout()` — cerrar sesión en tu proveedor. |
 
-Interfaz de búsqueda sobre bases de conocimiento con filtros por categoría, tipo de archivo, fecha y relevancia mínima.
+Para Azure AD, `src/config/msalConfig.ts` trae la configuración comentada como
+plantilla; al activarla requiere `VITE_CLIENT_ID`, `VITE_TENANT_ID` y
+`VITE_REDIRECT_URI` (ver los ejemplos comentados en `.env.example`).
 
-**Stack:** React 19 · TypeScript · Vite · Tailwind CSS v4
+### 3. Modelos del selector de LLM
 
-| Característica | Detalle |
-|---|---|
-| Búsqueda semántica | Consultas en lenguaje natural con score de similitud coseno |
-| Filtros | Categoría, tipo de archivo, rango de fechas, relevancia mínima |
-| Badges | Exacto ≥95% / Alto ≥85% / Medio ≥70% / Bajo <70% |
-| Contexto expandido | Fragmento ampliado por resultado |
-| Tema | Claro / oscuro con variables CSS |
+El catálogo vive en `src/components/gpt/DropdownModel.tsx`. Cada entrada define
+un `value` que viaja al backend como `model_name`:
+
+```ts
+{ value: "gpt-5.4", label: "LLM - OpenAI", description: "gpt-5.4" }
+```
+
+Al integrar el backend, ajusta esos `value` a los identificadores reales que
+espera el servicio. El primer elemento de la lista es el modelo por defecto.
+
+> Si algún modelo necesita ejecución en segundo plano (respuesta `202` +
+> *polling*, para procesos que superan el límite de 240 s del ingress), agrega su
+> `model_name` al conjunto `ASYNC_SEMA_FLOWS` en `src/api/ApiGPT.ts`.
+
+### 4. Colores de marca
+
+Se definen en un solo lugar, `src/index.css`, en formato HSL:
+
+```css
+:root {
+  --brand-primary: ...;
+  --brand-secondary: ...;
+  --brand-accent: ...;
+}
+```
+
+Se usan desde Tailwind con `bg-brand-primary`, `text-brand-primary`, etc.
+
+---
+
+## Endpoints que consume
+
+**Chat** — `src/api/ApiGPT.ts`, relativos a `VITE_APP_API_URL_GPT`:
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/sessions` | GET / POST | Lista y crea conversaciones |
+| `/sessions/:id/messages` | GET | Mensajes de una conversación |
+| `/sessions/:id/rename` | PATCH | Renombra una conversación |
+| `/sessions/:id` | DELETE | Elimina una conversación |
+| `/message` | POST | Envía un mensaje |
+| `/attachment` | POST | Envía un mensaje con archivos |
+| `/vote` | POST | Califica una respuesta |
+| `/sema/run`, `/sema/run/:id/status` | POST / GET | Ejecución asíncrona y su estado |
+| `/sema/artifact` | GET | Descarga el Excel generado |
+
+**SQL** — `src/api/ApiSQL.ts`, relativos a `VITE_APP_API_URL_SQL` + `/api`:
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/ask` | POST | Consulta en lenguaje natural |
+| `/recover-chat` | POST | Recupera el historial |
+| `/schemas?catalog=` | GET | Esquemas del catálogo |
+| `/save-sql` | POST | Guarda una consulta |
+
+---
+
+## Despliegue
+
+La imagen es multi-etapa: compila con Node 18 y sirve el resultado estático con
+Nginx en el puerto **80**. `nginx.conf` ya incluye el *fallback* a `index.html`
+que necesita el enrutamiento del lado del cliente.
 
 ```bash
-cd search-engine && npm install && npm run dev
+docker build \
+  --build-arg VITE_APP_API_URL_GPT="https://<host>/api/v1" \
+  --build-arg VITE_APP_API_URL_SQL="https://<host>" \
+  --build-arg VITE_CATALOG="sema_persistence" \
+  --build-arg VITE_USE_MOCKS="false" \
+  -t agentes-procaps .
+
+docker run -p 8080:80 agentes-procaps
 ```
 
-→ Ver [search-engine/README.md](search-engine/README.md)
+Lista de verificación antes de publicar:
+
+- [ ] `VITE_USE_MOCKS=false`.
+- [ ] URLs de backend apuntando al ambiente correcto (no a `localhost`).
+- [ ] Autenticación conectada en los tres archivos de la sección 2.
+- [ ] Backend con CORS habilitado para el dominio del frontend.
+- [ ] `values` del selector de LLM alineados con los del backend.
+
+El pipeline de Azure DevOps (`Pipelines/config.yaml`) publica la imagen
+`ai-hub` en el registro `azcrprocapsdevservicios.azurecr.io`.
 
 ---
 
-### 3. `chat_bot/` — Chatbot de Planificación
+## Estructura
 
-![Chat Bot](chat_bot/image/README/1772341090666.png)
+```
+src/
+├── api/          # Clientes HTTP: ApiGPT.ts (chat), ApiSQL.ts (SQL)
+├── components/
+│   ├── custom/   # Header, sidebar, mensajes, entrada de chat
+│   ├── gpt/      # Selector de modelo y modales del chat
+│   ├── layout/   # MainLayout (sidebar + header + contenido)
+│   └── ui/       # Componentes base Radix/Shadcn
+├── config/       # msalConfig.ts (Azure AD)
+├── context/      # ThemeContext: tema claro/oscuro y modelo seleccionado
+├── hooks/        # useLogout
+├── mocks/        # Datos de prueba para VITE_USE_MOCKS=true
+├── pages/
+│   ├── chatGPT/  # Chat principal ("/" y "/c/:id")
+│   ├── chatSql/  # Agente SQL ("/sql")
+│   └── login/    # Login (pendiente de conectar)
+└── utils/auth.ts # Manejo del token
+```
 
-Chatbot dark-mode con sugerencias rápidas y diseño minimalista.
-
-**Stack:** Next.js 15 · React 19 · TypeScript · Tailwind CSS v4 · Shadcn/Radix UI
-
-| Característica | Detalle |
-|---|---|
-| Diseño | Dark mode por defecto, toggle claro/oscuro |
-| Sugerencias | Pills de acciones rápidas configurables |
-| Mocks | Respuestas simuladas en `app/page.tsx` → `getAIResponse()` |
-| Backend | Conectar en `handleSubmit()` con `NEXT_PUBLIC_API_URL` |
+## Scripts
 
 ```bash
-cd chat_bot && npm install && npm run dev
-```
-
-→ Ver [chat_bot/README.md](chat_bot/README.md)
-
----
-
-## Comparativa rápida
-
-| | `rag` | `search-engine` | `chat_bot` |
-|---|---|---|---|
-| Framework | React + Vite | React + Vite | Next.js 15 |
-| Tailwind | v3 | v4 | v4 |
-| Mocks incluidos | ✅ con env var | ✅ en `src/mock/` | ✅ en `page.tsx` |
-| Auth stub | ✅ | — | — |
-| Docker | ✅ | — | ✅ |
-
----
-
-## Flujo para usar una plantilla
-
-```
-1. Copiar la carpeta de la plantilla a tu proyecto
-2. cp .env.example .env
-3. npm install
-4. npm run dev          ← funciona con mocks
-5. Cambiar colores en index.css / globals.css
-6. Conectar backend:    VITE_USE_MOCKS=false (o NEXT_PUBLIC_API_URL=...)
-7. Conectar auth:       editar src/utils/auth.ts (o app/page.tsx)
+npm run dev       # Servidor de desarrollo (puerto 8501)
+npm run build     # Build de producción a dist/
+npm run preview   # Previsualiza el build
+npm run lint      # ESLint
 ```
