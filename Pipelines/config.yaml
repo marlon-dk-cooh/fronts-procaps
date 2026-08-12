@@ -1,36 +1,83 @@
 trigger:
   branches:
     include:
-      - desarrollo
+      - feature/chat_ui
     exclude:
+      - desarrollo
       - main
 
 pool:
   vmImage: ubuntu-latest
 
 variables:
-  azureServiceConnection: 'Procaps-conexion'
-  resourceGroup: 'AZ-RG-PROCAPS-Dev-ServiciosCognitivos'
-  containerAppName: 'azcrprocapsdevservicios'
-  acrName: 'azcrprocapsdevservicios'
-  acrLoginServer: 'azcrprocapsdevservicios.azurecr.io'
-  imageRepository: 'ai-hub'
-  imageTag: '$(Build.BuildId)'
-  imageName: '$(acrLoginServer)/$(imageRepository):$(imageTag)'
+  # Variables específicas de la aplicación
+  - name: azureServiceConnection
+    value: "Procaps-conexion" # Nombre de la conexión en DevOps para el despliegue en Azure
+  - name: acrName
+    value: "azcrprocapsdevservicios" # Nombre del Azure Container Registry
+  - name: resourceGroup
+    value: "AZ-RG-PROCAPS-Dev-ServiciosCognitivos"
+  - name: webAppName
+    value: "az-webapp-prueba-framework-dev" # Nombre del Azure Web App donde se despliega el contenedor
+  - name: acrLoginServer
+    value: "$(acrName).azurecr.io"
+  - name: imageRepository
+    value: "test-framework-ia"
+  - name: imageTag
+    value: "$(Build.BuildId)"
+  - name: dockerfilePath
+    value: "$(Build.SourcesDirectory)/Dockerfile"
+  - name: buildContext
+    value: "$(Build.SourcesDirectory)"
+  - name: imageName
+    value: "$(acrLoginServer)/$(imageRepository):$(imageTag)"
 
-- task: DockerCompose@1
-  inputs:
-    containerregistrytype: 'Azure Container Registry'
-    azureContainerRegistry: '{"loginServer":"azcrprocapsdevservicios.azurecr.io", "id" : "/subscriptions/6c39d688-4bac-4fe5-85f2-11e39fb7fb4a/resourceGroups/AZ-RG-PROCAPS-Dev-ServiciosCognitivos/providers/Microsoft.ContainerRegistry/registries/azcrprocapsdevservicios"}'
-    dockerComposeFile: '**/docker-compose.yml'
-    action: 'Run a Docker Compose command'
+stages:
+  - stage: Build
+    displayName: Construcción y push de imagen Docker.
+    jobs:
+      - job: BuildAndPush
+        displayName: Construcción y push de Imagen Docker a Azure Container Registry.
+        steps:
+          - task: AzureCLI@2
+            displayName: Construcción y push a ACR
+            inputs:
+              azureSubscription: "$(azureServiceConnection)"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az acr login --name "$(acrName)"
+                docker build -t "$(imageName)" -t "$(acrLoginServer)/$(imageRepository):latest" -f Dockerfile .
+                docker push "$(imageName)"
+                docker push "$(acrLoginServer)/$(imageRepository):latest"
 
-- task: AzureRmWebAppDeployment@5
-  inputs:
-    ConnectionType: 'AzureRM'
-    azureSubscription: 'Procaps-conexion'
-    appType: 'webAppContainer'
-    WebAppName: 'az-app-procaps-dev'
-    DockerNamespace: 'azcrprocapsdevservicios'
-    DockerRepository: 'ai-hub'
-    DockerImageTag: 'latest'
+  - stage: Deploy
+    displayName: Despliegue en Azure Web App.
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DeployWebApp
+        displayName: Despliegue de imagen en Azure Web App for Containers
+        steps:
+
+          - task: AzureWebAppContainer@1
+            displayName: Despliegue de imagen a Azure Web App
+            inputs:
+              azureSubscription: "$(azureServiceConnection)"
+              appName: "$(webAppName)"
+              containers: "$(imageName)"
+
+          - task: AzureCLI@2
+            displayName: Mostrar los últimos 10 logs del Web App
+            inputs:
+              azureSubscription: "$(azureServiceConnection)"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                echo "Obteniendo logs del Web App..."
+                timeout 20 az webapp log tail \
+                  --name "$(webAppName)" \
+                  --resource-group "$(resourceGroup)" \
+                  | head -n 10 || true
