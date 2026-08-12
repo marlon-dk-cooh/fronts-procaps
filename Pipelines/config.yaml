@@ -10,7 +10,7 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  # Variables específicas de la aplicación
+  # Variables específicas de la aplicación.
   - name: azureServiceConnection
     value: "Procaps-conexion" # Nombre de la conexión en DevOps para el despliegue en Azure
   - name: acrName
