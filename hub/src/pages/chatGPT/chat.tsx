@@ -99,7 +99,6 @@ export function Chat({
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
   const [question, setQuestion] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -109,15 +108,42 @@ export function Chat({
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const [isSearch, setIsSearch] = useState(false);
-  const isStop = useRef<boolean>(false);
   const { logout, user } = UseLogout();
   const { modelSelect } = useTheme();
-  // Avance del run SEMA en segundo plano; alimenta la ProgressBar.
-  const [runProgress, setRunProgress] = useState<{ value?: number; label: string }>({
-    label: "Pensando...",
-  });
+  // La instancia de Chat sobrevive al cambiar de sesión (misma ruta /sema/c/:id,
+  // sin remount), así que el estado de "cargando" no puede ser un solo booleano:
+  // se indexa por sessionId para que cada sesión procese/bloquee de forma
+  // independiente y se pueda consultar/enviar en otra sesión sin problema.
+  const [loadingSessions, setLoadingSessions] = useState<Set<string>>(new Set());
+  // Avance del run SEMA en segundo plano por sesión; alimenta la ProgressBar.
+  const [progressBySession, setProgressBySession] = useState<
+    Record<string, { value?: number; label: string }>
+  >({});
+  // Sesiones detenidas manualmente por el usuario (botón Stop).
+  const stoppedSessions = useRef<Set<string>>(new Set());
   // Permite cancelar el polling si el componente se desmonta a mitad de un run.
   const pollAbort = useRef<boolean>(false);
+
+  const setSessionLoading = (sessionId: string, loading: boolean) => {
+    setLoadingSessions((prev) => {
+      const next = new Set(prev);
+      if (loading) next.add(sessionId);
+      else next.delete(sessionId);
+      return next;
+    });
+  };
+
+  const setSessionProgress = (sessionId: string, progress: { value?: number; label: string }) => {
+    setProgressBySession((prev) => ({ ...prev, [sessionId]: progress }));
+  };
+
+  const clearSessionProgress = (sessionId: string) => {
+    setProgressBySession((prev) => {
+      const next = { ...prev };
+      delete next[sessionId];
+      return next;
+    });
+  };
 
   useEffect(() => {
     pollAbort.current = false;
@@ -136,6 +162,7 @@ export function Chat({
    */
   const pollSemaRun = async (
     runId: string,
+    sessionId: string,
     isCancelled?: () => boolean
   ): Promise<SemaRunStatus> => {
     const startedAt = Date.now();
@@ -144,7 +171,7 @@ export function Chat({
       // `isCancelled` es propio de cada reanudación. `pollAbort` no alcanza ahí:
       // vuelve a false al remontar, así que un bucle viejo reviviría y publicaría
       // la respuesta por duplicado.
-      if (pollAbort.current || isStop.current || isCancelled?.()) {
+      if (pollAbort.current || stoppedSessions.current.has(sessionId) || isCancelled?.()) {
         throw new Error("cancelado por el usuario");
       }
       if (Date.now() - startedAt > SEMA_POLL_TIMEOUT_MS) {
@@ -163,7 +190,7 @@ export function Chat({
         continue;
       }
 
-      setRunProgress({
+      setSessionProgress(sessionId, {
         value: status.progress,
         label: status.detail || "Procesando...",
       });
@@ -190,10 +217,10 @@ export function Chat({
     runId: string,
     isCancelled: () => boolean
   ) => {
-    setIsLoading(true);
-    setRunProgress({ label: "Retomando el proceso..." });
+    setSessionLoading(sessionId, true);
+    setSessionProgress(sessionId, { label: "Retomando el proceso..." });
     try {
-      const status = await pollSemaRun(runId, isCancelled);
+      const status = await pollSemaRun(runId, sessionId, isCancelled);
       const resumedId = status.message_id || runId;
 
       // Al terminar, el backend ya guardó el intercambio en el historial. Si la
@@ -233,8 +260,8 @@ export function Chat({
     } finally {
       if (!pollAbort.current && !isCancelled()) {
         clearStoredRun(sessionId);
-        setIsLoading(false);
-        setRunProgress({ label: "Pensando..." });
+        setSessionLoading(sessionId, false);
+        clearSessionProgress(sessionId);
       }
     }
   };
@@ -277,7 +304,8 @@ export function Chat({
     is_regenerate: boolean;
     files: File[] | null;
   }) => {
-    if (isLoading || !user) return;
+    // Sólo bloquea reenvíos dentro de ESTA sesión; otras sesiones siguen libres.
+    if (loadingSessions.has(idChat) || !user) return;
     const messageId = idMessageCorrected || uuidv4();
     const DESIRED_LENGTH = 28;
     const messageText = text;
@@ -295,19 +323,21 @@ export function Chat({
       pushMessage({ id: messageId, answer: text, role: "user", files, rate: null });
     }
 
-    setIsLoading(true);
-
     // New chats: backend requires a pre-created session before any message.
     // Create it first so every subsequent pushMessage uses the real session_id.
     let activeSessionId = idChat;
+    setSessionLoading(activeSessionId, true);
     if (newChat) {
       try {
         const sessionRes = await api.requestCreateSession(titleChat);
+        // La sesión temporal ya no existe: el spinner/progreso se muda al id real.
+        setSessionLoading(activeSessionId, false);
         activeSessionId = sessionRes.session_id;
+        setSessionLoading(activeSessionId, true);
         setIdChat(activeSessionId);
       } catch (sessionErr: any) {
         logout(sessionErr?.response?.statusText || "");
-        setIsLoading(false);
+        setSessionLoading(activeSessionId, false);
         return;
       }
       // Push user message under the real session key so it survives navigation.
@@ -339,7 +369,7 @@ export function Chat({
           // Flujo pesado: se acepta con 202 y se sigue por polling. `client_run_id`
           // es la clave de idempotencia: un reintento no dispara un segundo OCR.
           formData.append("client_run_id", messageId);
-          setRunProgress({ value: 0, label: "Enviando los documentos..." });
+          setSessionProgress(activeSessionId, { value: 0, label: "Enviando los documentos..." });
 
           const accepted = await api.requestSemaRun(formData);
           // Se guarda ANTES de empezar a esperar: si el usuario refresca a los
@@ -348,7 +378,7 @@ export function Chat({
 
           let status: SemaRunStatus;
           try {
-            status = await pollSemaRun(accepted.run_id);
+            status = await pollSemaRun(accepted.run_id, activeSessionId);
           } finally {
             // Si se abortó por desmontaje, el run sigue vivo: conservar el
             // puntero es lo que permite retomarlo al volver.
@@ -378,8 +408,8 @@ export function Chat({
         assistantArtifacts = res.artifacts || [];
       }
 
-      if (isStop.current) {
-        isStop.current = false;
+      if (stoppedSessions.current.has(activeSessionId)) {
+        stoppedSessions.current.delete(activeSessionId);
         return;
       }
 
@@ -418,8 +448,8 @@ export function Chat({
         ]);
         navigate(`/sema/c/${activeSessionId}`);
       }
-      setIsLoading(false);
-      setRunProgress({ label: "Pensando..." });
+      setSessionLoading(activeSessionId, false);
+      clearSessionProgress(activeSessionId);
       setFiles([]);
     }
   };
@@ -565,8 +595,11 @@ export function Chat({
   }, [id]);
 
   const handleStop = async () => {
-    isStop.current = true;
-    setIsLoading(false);
+    // El botón Stop sólo se muestra para la sesión que se está viendo, así que
+    // siempre detiene idChat (nunca una sesión distinta procesando en segundo plano).
+    stoppedSessions.current.add(idChat);
+    setSessionLoading(idChat, false);
+    clearSessionProgress(idChat);
     // El run sigue vivo en el backend; esto sólo evita que la próxima carga de
     // la página lo retome, que es justo lo que el usuario acaba de descartar.
     clearStoredRun(idChat);
@@ -788,14 +821,15 @@ export function Chat({
                 )}
               </Fragment>
             ))}
-          {isLoading && (
+          {loadingSessions.has(idChat) && (
             <div className="w-full max-w-xl">
               {/* Con `value` la barra pasa a modo determinado: el porcentaje sale
                   del avance real del pipeline (OCR, extracción, render), no de
-                  una animación simulada. */}
+                  una animación simulada. Sólo se muestra en la sesión que está
+                  siendo procesada; el resto de sesiones no se ven afectadas. */}
               <ProgressBar
-                value={runProgress.value}
-                label={runProgress.label}
+                value={progressBySession[idChat]?.value}
+                label={progressBySession[idChat]?.label ?? "Pensando..."}
                 showValue
               />
             </div>
@@ -813,7 +847,7 @@ export function Chat({
         question={question}
         setQuestion={setQuestion}
         onSubmit={handleSubmit}
-        isLoading={isLoading}
+        isLoading={loadingSessions.has(idChat)}
         instructions={instructions}
         setInstructions={setInstructions}
         hasStartedChat={false}
