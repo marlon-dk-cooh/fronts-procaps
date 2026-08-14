@@ -113,7 +113,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -140,7 +140,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -168,7 +168,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -199,7 +199,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -210,7 +210,7 @@ const realApi = {
     const response: ApiResponse = await apiClientMultipart.post(
       "/attachment",
       attachment,
-      { headers: { Authorization: `Bearer ${getAuthToken()}` } }
+      { headers: { Authorization: `Bearer ${await getAuthToken()}` } }
     );
     return response.data;
   },
@@ -227,7 +227,7 @@ const realApi = {
     const response: ApiResponse<SemaRunAccepted> = await apiClientMultipart.post(
       "/sema/run",
       attachment,
-      { headers: { Authorization: `Bearer ${getAuthToken()}` } }
+      { headers: { Authorization: `Bearer ${await getAuthToken()}` } }
     );
     return response.data;
   },
@@ -238,7 +238,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -258,7 +258,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -275,7 +275,7 @@ const realApi = {
     const response = await apiClientCommon.get("/sema/artifact", {
       params: { path },
       responseType: "blob",
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
+      headers: { Authorization: `Bearer ${await getAuthToken()}` },
     });
 
     const url = URL.createObjectURL(response.data as Blob);
@@ -295,7 +295,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );
@@ -314,7 +314,7 @@ const realApi = {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${await getAuthToken()}`,
         },
       }
     );

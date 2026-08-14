@@ -15,23 +15,23 @@ export default function AppRoutes() {
   const [allMessages, setAllMessages] = useState({});
   const [isLoadingChats, setIsLoadingChats] = useState(false);
 
-  function getAllChats() {
+  async function getAllChats() {
     setIsLoadingChats(true);
-    api
-      .requestAllSession(getAuthToken())
-      .then((res: ConversationSessionResponse) => {
-        setChats(
-          res.sessions.map((chat) => ({
-            ...chat,
-            chatId: chat.id,
-            title: chat.conversation_name,
-          }))
-        );
-      })
-      .catch((err) => {
-        console.error("Error fetching sessions:", err);
-      })
-      .finally(() => setIsLoadingChats(false));
+    try {
+      const token = await getAuthToken();
+      const res: ConversationSessionResponse = await api.requestAllSession(token);
+      setChats(
+        res.sessions.map((chat) => ({
+          ...chat,
+          chatId: chat.id,
+          title: chat.conversation_name,
+        }))
+      );
+    } catch (err) {
+      console.error("Error fetching sessions:", err);
+    } finally {
+      setIsLoadingChats(false);
+    }
   }
 
   function removeChatFromState(chatId: string) {

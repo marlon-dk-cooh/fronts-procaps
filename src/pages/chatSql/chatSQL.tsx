@@ -306,7 +306,7 @@ export function ChatSQL() {
     const fetchHistory = async () => {
       const user_id = "t0_example_auth0|648fd12a7c34aa00125a4b98";
       const jwt = "t0_example_auth0|648fd12a7c34aa00125a4b98";
-      const token = getAuthToken();
+      const token = await getAuthToken();
 
       if (!token) {
         console.warn("No token found");

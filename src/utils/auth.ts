@@ -1,38 +1,31 @@
 // ============================================================
-// AUTH UTILITIES — Conecta tu sistema de autenticación aquí
+// AUTH UTILITIES — Azure AD / MSAL
 // ============================================================
-// Estas funciones centralizan el manejo del token de acceso.
-//
-// TODO: Reemplaza la implementación de getAuthToken() con la de tu
-// proveedor de autenticación. Opciones comunes:
-//
-//   - JWT en localStorage:  return localStorage.getItem('token') ?? ''
-//   - Azure MSAL:           usar instance.acquireTokenSilent()
-//   - Auth0:                usar getAccessTokenSilently() del SDK
-//   - Keycloak:             usar keycloak.token
-//   - Cookie httpOnly:      no necesitas token aquí (el browser lo adjunta)
+// getAuthToken() adquiere el access token en silencio via MSAL. Si la sesión
+// expiró o requiere interacción (MFA, consentimiento, etc.), redirige a login.
 // ============================================================
 
-const TOKEN_KEY = 'authToken';
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
+import { loginRequest, msalInstance } from "@/config/msalConfig";
 
 /**
- * Obtiene el token de autenticación activo.
- * Reemplaza con la lógica de tu proveedor de auth.
+ * Obtiene el access token de la cuenta activa. Devuelve '' si no hay cuenta
+ * o si la adquisición silenciosa falla sin requerir interacción del usuario.
  */
-export function getAuthToken(): string {
-  return localStorage.getItem(TOKEN_KEY) ?? '';
-}
+export async function getAuthToken(): Promise<string> {
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (!account) return "";
 
-/**
- * Guarda el token tras un login exitoso.
- */
-export function setAuthToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * Elimina el token al hacer logout.
- */
-export function clearAuthToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      ...loginRequest,
+      account,
+    });
+    return result.accessToken;
+  } catch (error) {
+    if (error instanceof InteractionRequiredAuthError) {
+      await msalInstance.acquireTokenRedirect({ ...loginRequest, account });
+    }
+    return "";
+  }
 }

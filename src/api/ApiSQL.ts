@@ -50,21 +50,21 @@ const realRecoverChat = async (
 
 const realAskSQL = async (payload: AskSQLPayload): Promise<any> => {
   const response = await client.post("/ask", payload, {
-    headers: { Authorization: `Bearer ${getAuthToken()}` },
+    headers: { Authorization: `Bearer ${await getAuthToken()}` },
   });
   return response.data;
 };
 
 const realGetSchemas = async (catalog: string): Promise<any> => {
   const response = await client.get(`/schemas?catalog=${catalog}`, {
-    headers: { Authorization: `Bearer ${getAuthToken()}` },
+    headers: { Authorization: `Bearer ${await getAuthToken()}` },
   });
   return response.data;
 };
 
 const realSaveSql = async (payload: any): Promise<any> => {
   const response = await client.post("/save-sql", payload, {
-    headers: { Authorization: `Bearer ${getAuthToken()}` },
+    headers: { Authorization: `Bearer ${await getAuthToken()}` },
   });
   return response.data;
 };

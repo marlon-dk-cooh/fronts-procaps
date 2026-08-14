@@ -2,16 +2,15 @@ import { useState } from "react";
 import { User, Moon, Sun, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTheme } from "@/context/ThemeContext";
-import { clearAuthToken } from "@/utils/auth";
+import { useMsal } from "@azure/msal-react";
 
 export function UserMenu() {
   const { isDarkMode, toggleTheme } = useTheme();
+  const { instance } = useMsal();
   const [open, setOpen] = useState(false);
 
   const handleLogout = () => {
-    clearAuthToken();
-    // TODO: Agrega logout de tu auth provider aquí
-    window.location.href = "/";
+    instance.logoutRedirect();
   };
 
   return (

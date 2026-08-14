@@ -12,6 +12,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.18.0",
+    "@azure/msal-react": "^5.5.5",
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-label": "^2.1.0",
